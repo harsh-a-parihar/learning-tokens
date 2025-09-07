@@ -3,5 +3,4 @@ Labs/.DS_Store
 src/.DS_Store
 *.cjs
 *.mjs
-/src/learning-token-backend/.yarn
 .env

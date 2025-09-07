@@ -1,1 +1,1 @@
-export { run } from './zoomprocessor';
+export { getEdxUserProfile, getEdxUserEnrollments, getEdxCourseAssessments, getEdxAssessmentQuestions, getEdxAssessmentResponses, getEdxCourseGrade, getEdxCourseParticipants, getEdxCourseInstructors, getEdxAssessmentAttendance, getEdxAssessmentAnalytics, getEdxUserCertificate, getEdxCourses, getEdxAccessToken, processEdxCourseData, calculateEdxAssessmentScores, aggregateEdxParticipantData, processEdxData } from './edxDataprocessor';

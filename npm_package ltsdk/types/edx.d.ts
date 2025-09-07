@@ -1,31 +1,30 @@
 // edxDataFetch.ts
 import axios, { AxiosResponse } from 'axios';
-// ------------------------------------------------------------sure----------------------------------------------------------
 
-// sure
+
 export interface EdxCourse {
   id: string; // course-v1:org+course+run
   org: string;
   course: string;
   run: string;
   display_name: string;
-  start: string; // ISO date
-  end?: string; // ISO date
+  start: string;
+  end?: string;
   enrollment_start?: string;
   enrollment_end?: string;
 }
 
-// sure
+
 export interface EdxEnrollment {
   id: number;
   user_id: number;
   course_id: string;
-  created: string; // ISO date
+  created: string; 
   is_active: boolean;
   mode: string; // audit, honor, verified, etc.
 }
 
-// sure
+
 export interface EdxCourseGrade {
   course_id: string;
   user_id: number;
@@ -36,7 +35,7 @@ export interface EdxCourseGrade {
   modified: string;
 }
 
-// sure
+
 export interface EdxSubsectionGrade {
   course_id: string;
   user_id: number;
@@ -50,9 +49,9 @@ export interface EdxSubsectionGrade {
   modified: string;
 }
 
-// sure
+
 export interface EdxAssessment {
-  id: string; // unique identifier for the assessment
+  id: string; 
   course_id: string;
   name: string;
   description?: string;
@@ -62,18 +61,18 @@ export interface EdxAssessment {
   questions: EdxAssessmentQuestion[];
 }
 
-// sure
+
 export interface EdxAssessmentQuestion {
   id: string;
   assessment_id: string;
   text: string;
   type: string; // e.g., "multiple_choice", "short_answer"
-  options?: string[]; // for MCQ
-  correct_answers?: string[]; // for auto-graded
+  options?: string[]; 
+  correct_answers?: string[]; 
   max_score: number;
 }
 
-// sure
+
 export interface EdxAssessmentResponse {
   id: string;
   assessment_id: string;
@@ -86,7 +85,7 @@ export interface EdxAssessmentResponse {
   graded_at?: string;
 }
 
-// sure
+
 export interface EdxAssessmentParticipant {
   user_id: number;
   username: string;
@@ -98,7 +97,7 @@ export interface EdxAssessmentParticipant {
   certificate?: EdxCertificate;
 }
 
-// sure
+
 export interface EdxAssessmentResult {
   assessment_id: string;
   total_score: number;
@@ -110,7 +109,7 @@ export interface EdxAssessmentResult {
   completed_at?: string;
 }
 
-// sure (helpful)
+
 export interface EdxAssessmentAnalytics {
   course_id: string;
   assessment_id: string;
@@ -123,7 +122,7 @@ export interface EdxAssessmentAnalytics {
   attendance: EdxAssessmentAttendance[];
 }
 
-// sure
+
 export interface EdxAssessmentAttendance {
   user_id: number;
   attended: boolean;
@@ -136,9 +135,9 @@ export interface ApiResponse<T> {
   status: number;
   statusText: string;
   message?: string; // error or info message from API
-  count?: number; // total records (for paginated endpoints)
-  next?: string; // next page URL (if paginated)
-  previous?: string; // previous page URL (if paginated)
+  count?: number;
+  next?: string;
+  previous?: string;
 }
 
 // Map user_id to user info (for Open edX)
@@ -151,9 +150,6 @@ export interface UserEmailMap {
   };
 }
 
-// ------------------------------------------------------------optional & not sure----------------------------------------------------------
-
-// not sure
 export interface EdxCertificate {
     id: number;
     user_id: number;
@@ -167,7 +163,6 @@ export interface EdxCertificate {
     mode: string;
 }
 
-// optional (not sure)
 export interface EdxInstructor {
     user_id: number;
     username: string;

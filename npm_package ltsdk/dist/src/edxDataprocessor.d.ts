@@ -1,0 +1,18 @@
+import { EdxAssessmentParticipant, EdxEnrollment, EdxAssessment, EdxAssessmentQuestion, EdxAssessmentResponse, EdxCourseGrade, EdxAssessmentAttendance, EdxAssessmentAnalytics, EdxInstructor, EdxCertificate, ApiResponse } from '../types/edx.d';
+export declare function getEdxUserProfile(userId: number, accessToken: string): Promise<ApiResponse<EdxAssessmentParticipant>>;
+export declare function getEdxUserEnrollments(userId: number, accessToken: string): Promise<ApiResponse<EdxEnrollment[]>>;
+export declare function getEdxCourseAssessments(courseId: string, accessToken: string): Promise<ApiResponse<EdxAssessment[]>>;
+export declare function getEdxAssessmentQuestions(assessmentId: string, accessToken: string): Promise<ApiResponse<EdxAssessmentQuestion[]>>;
+export declare function getEdxAssessmentResponses(assessmentId: string, accessToken: string, userId?: number): Promise<ApiResponse<EdxAssessmentResponse[]>>;
+export declare function getEdxCourseGrade(courseId: string, userId: number, accessToken: string): Promise<ApiResponse<EdxCourseGrade>>;
+export declare function getEdxCourseParticipants(courseId: string, accessToken: string): Promise<ApiResponse<EdxAssessmentParticipant[]>>;
+export declare function getEdxCourseInstructors(courseId: string, accessToken: string): Promise<ApiResponse<EdxInstructor[]>>;
+export declare function getEdxAssessmentAttendance(assessmentId: string, accessToken: string): Promise<ApiResponse<EdxAssessmentAttendance[]>>;
+export declare function getEdxAssessmentAnalytics(courseId: string, assessmentId: string, accessToken: string): Promise<ApiResponse<EdxAssessmentAnalytics>>;
+export declare function getEdxUserCertificate(courseId: string, userId: number, accessToken: string): Promise<ApiResponse<EdxCertificate>>;
+export declare function getEdxCourses(accessToken: string): Promise<ApiResponse<any>>;
+export declare function processEdxCourseData(participants: EdxAssessmentParticipant[], assessments: EdxAssessment[], grades: EdxCourseGrade[]): Map<string, any>;
+export declare function calculateEdxAssessmentScores(assessmentQuestions: EdxAssessmentQuestion[], assessmentResponses: EdxAssessmentResponse[]): Map<string, any>;
+export declare function aggregateEdxParticipantData(participantMap: Map<string, any>, assessmentScores: Map<string, any>): any;
+export declare function processEdxData(courseId: string, accessToken: string): Promise<any>;
+export declare function getEdxAccessToken(username: string, password: string, clientId: string, clientSecret: string, baseUrl?: string): Promise<string>;

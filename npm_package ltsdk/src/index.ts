@@ -1,7 +1,4 @@
 // index.ts
-
-export { run } from './zoomprocessor';
-
 // Export edX LMS functions
 export {
   getEdxUserProfile,

@@ -13,7 +13,7 @@ import {
 } from '../types/edx.d';
 import axios from 'axios';
 
-// Open edX API base URL - update this to your actual Open edX instance
+// Open edX API base URL
 const baseUrl = 'http://local.openedx.io/api';
 
 // Helper function to get auth headers
@@ -454,7 +454,7 @@ export async function processEdxData(
       [gradesResponse.data] // This should be an array of grades for all participants
     );
     
-    // For now, create empty assessment scores (you'll need to implement this based on your specific needs)
+    // For now, create empty assessment scores
     const assessmentScores = new Map<string, any>();
     
     // Aggregate the data
