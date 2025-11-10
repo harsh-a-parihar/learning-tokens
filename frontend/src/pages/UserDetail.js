@@ -1,37 +1,63 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import edxApi from '../services/edxApi';
+import useLmsData from '../hooks/useLmsData'
 import './UserDetail.css';
 
 const UserDetail = () => {
   const { username, courseId, userType } = useParams();
   const navigate = useNavigate();
   const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingLocal, setLoadingLocal] = useState(true);
   const [error, setError] = useState(null);
 
+  const decodedCourseId = courseId ? decodeURIComponent(courseId) : '';
+  // use normalized SDK payload to find user data
+  const { payload, loading: sdkLoading } = useLmsData('edx', decodedCourseId, !!decodedCourseId)
+
+  const loading = sdkLoading || loadingLocal
+
   useEffect(() => {
-    const fetchUserData = async () => {
-      if (!username || !courseId) {
+    async function deriveFromPayload() {
+      if (!username || !decodedCourseId) {
         setError('Missing required parameters');
-        setLoading(false);
+        setLoadingLocal(false);
         return;
       }
 
+      setLoadingLocal(true);
+      setError(null);
       try {
-        setLoading(true);
-        const detailedData = await edxApi.getUserDetailedData(courseId, username);
-        setUserData(detailedData);
-      } catch (err) {
-        console.error('Error fetching user data:', err);
-        setError(err.message);
+        const learners = payload?.learners || [];
+        const instructors = payload?.instructors || [];
+        const findByUsernameOrId = (list) => list.find(u => u.username === username || u.id === username || u.email === username)
+        let found = findByUsernameOrId(learners) || findByUsernameOrId(instructors)
+        if (found) {
+          // build a lightweight userData similar shape to legacy detailed data
+          const gradebook = {
+            username: found.username || found.id || username,
+            email: found.email || null,
+            percent: found.percent || null,
+            user_id: found.id || null,
+            section_breakdown: found.section_breakdown || []
+          }
+          const account = { name: found.name || null, email: found.email || null, is_active: found.is_active }
+          const detailed = { gradebook, account, assignments: found.assignments || [] }
+          setUserData(detailed)
+        } else {
+          setUserData(null)
+          setError('User not found in normalized payload')
+        }
+      } catch (e) {
+        setError(e.message || String(e))
       } finally {
-        setLoading(false);
+        setLoadingLocal(false)
       }
-    };
+    }
 
-    fetchUserData();
-  }, [username, courseId]);
+    // wait for SDK payload load
+    if (sdkLoading) return
+    deriveFromPayload()
+  }, [username, decodedCourseId, payload, sdkLoading]);
 
   if (loading) {
     return (

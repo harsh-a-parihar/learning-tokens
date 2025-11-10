@@ -1,10 +1,40 @@
 .edx-page {
   min-height: 100vh;
+  background: #ffffff;
+  color: #111827;
 }
 
-.main-content {
-  padding-top: 2rem;
-  min-height: 100vh;
+.edx-main-content {
+  padding: 2rem;
+}
+
+.edx-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.edx-header-banner {
+  background: linear-gradient(135deg, #0066cc 0%, #004d99 100%);
+  border-radius: 16px;
+  padding: 3rem 2rem;
+  margin-bottom: 3rem;
+  text-align: center;
+  color: white;
+  box-shadow: 0 10px 25px rgba(0, 102, 204, 0.3);
+}
+
+.edx-banner-content h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.edx-subtitle {
+  font-size: 1.2rem;
+  font-weight: 400;
+  opacity: 0.9;
+  font-style: italic;
 }
 
 .edx-content {
@@ -14,12 +44,11 @@
 }
 
 .status-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  padding: 2rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  background: var(--surface, #fff);
+  border-radius: 14px;
+  padding: 1.5rem;
+  border: 1px solid var(--card-border, rgba(0,0,0,0.06));
+  box-shadow: 0 8px 24px rgba(15,23,42,0.04);
 }
 
 .status-header {
@@ -35,23 +64,23 @@
 }
 
 .status-header h2 {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
-  color: #1a202c;
+  color: var(--text, #0f172a);
 }
 
 .status-indicator {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-weight: 600;
-  font-size: 0.875rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 16px;
+  font-weight: 700;
+  font-size: 0.85rem;
 }
 
 .status-indicator.active {
-  background: #10b981;
+  background: var(--success, #10b981);
   color: white;
 }
 
@@ -61,6 +90,21 @@
   border-radius: 50%;
   background: white;
   animation: pulse 2s infinite;
+}
+
+.validation-icon,
+.error-icon,
+.stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(15,23,42,0.03);
+  color: var(--muted, #94a3b8);
+  font-weight: 600;
+  font-size: 0.85rem;
 }
 
 @keyframes pulse {
@@ -628,28 +672,19 @@
 }
 
 @media (max-width: 768px) {
-  .page-header h1 {
+  .edx-main-content {
+    padding: 1.5rem;
+  }
+  
+  .edx-header-banner {
+    padding: 2rem 1.5rem;
+  }
+  
+  .edx-banner-content h1 {
     font-size: 2rem;
   }
   
-  .features-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .status-header {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: flex-start;
-  }
-  
-  .action-buttons {
-    flex-direction: column;
-    align-items: center;
-  }
-  
-  .endpoint-item {
-    flex-direction: column;
-    gap: 0.5rem;
-    align-items: flex-start;
+  .edx-subtitle {
+    font-size: 1rem;
   }
 }

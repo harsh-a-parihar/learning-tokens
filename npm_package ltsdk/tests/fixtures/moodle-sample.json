@@ -1,0 +1,11 @@
+{
+  "id": 1001,
+  "fullname": "Moodle 101",
+  "startdate": "2025-02-01T00:00:00Z",
+  "enddate": "2025-06-01T00:00:00Z",
+  "category": { "id": 55, "name": "Moodle Dept" },
+  "teachers": [ { "id": 11, "email": "teacher@example.edu", "fullname": "Dr Moodle" } ],
+  "students": [ { "id": 21, "email": "studentA@example.edu", "fullname": "Student A" } ],
+  "activities": [ { "id": 500, "modname": "assign", "name": "Essay 1", "maxgrade": 50, "submissions": [ { "userid": 21, "grade": 45, "timemodified": "2025-03-01T12:00:00Z" } ] } ],
+  "forum": [ { "discussions": [ { "posts": [ { "id": 9001, "userid": 21, "message": "I need help", "created": "2025-03-02T08:30:00Z" } ] } ] } ]
+}

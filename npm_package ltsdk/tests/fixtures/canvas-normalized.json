@@ -1,0 +1,71 @@
+{
+  "source": {
+    "lms": "canvas",
+    "rawCourseId": "42",
+    "fetchedAt": "2025-10-10T12:47:09.062Z"
+  },
+  "institution": {
+    "id": "7",
+    "name": "Example University"
+  },
+  "course": {
+    "id": "42",
+    "name": "Intro to Programming",
+    "startDate": "2025-01-15T08:00:00.000Z",
+    "endDate": "2025-05-15T17:00:00.000Z",
+    "metadata": {}
+  },
+  "instructors": [
+    {
+      "id": "101",
+      "email": "prof@example.edu",
+      "name": "Prof. Ada"
+    }
+  ],
+  "learners": [
+    {
+      "id": "201",
+      "email": "student1@example.edu",
+      "name": "Learner One",
+      "assignments": [
+        {
+          "id": "9001",
+          "type": "assignment",
+          "title": "Homework 1",
+          "maxScore": 100,
+          "is_quiz_assignment": false,
+          "quiz_id": null,
+          "submissions": [
+            {
+              "submitted_at": "2025-02-01T12:00:00.000Z",
+              "grades": [
+                {
+                  "score": 92,
+                  "totalscore": 100,
+                  "percentage": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "chat": [
+    {
+      "channel": "discussion",
+      "messages": [
+        {
+          "id": "5001",
+          "from": "201",
+          "text": "I have a question",
+          "ts": "2025-02-02T09:00:00.000Z"
+        }
+      ]
+    }
+  ],
+  "diagnostics": {
+    "missingEmailCount": 0,
+    "notes": []
+  }
+}

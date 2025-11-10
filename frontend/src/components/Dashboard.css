@@ -1,24 +1,40 @@
 .dashboard {
   min-height: 100vh;
+  background: #ffffff;
+  color: #111827;
 }
 
-.dashboard-header {
-  text-align: center;
+.main-content {
+  padding: 2rem;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.welcome-banner {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  padding: 3rem 2rem;
   margin-bottom: 3rem;
+  text-align: center;
   color: white;
+  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
 }
 
-.dashboard-header h1 {
-  font-size: 3rem;
+.welcome-content h1 {
+  font-size: 2.5rem;
   font-weight: 700;
   margin-bottom: 1rem;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  letter-spacing: -0.02em;
 }
 
-.dashboard-header p {
-  font-size: 1.25rem;
+.instruction-text {
+  font-size: 1.2rem;
+  font-weight: 400;
   opacity: 0.9;
-  font-weight: 300;
+  font-style: italic;
 }
 
 .lms-grid {
@@ -29,15 +45,14 @@
 }
 
 .lms-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
+  background: #ffffff;
   border-radius: 16px;
   padding: 2rem;
   text-decoration: none;
   color: inherit;
   transition: all 0.3s ease;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
   position: relative;
   overflow: hidden;
 }
@@ -54,8 +69,9 @@
 }
 
 .lms-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+  border-color: #d1d5db;
 }
 
 .lms-card:hover::before {
@@ -72,8 +88,8 @@
 }
 
 .lms-card.coming-soon:hover {
-  transform: none;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
 }
 
 .card-header {
@@ -84,87 +100,67 @@
 }
 
 .lms-icon {
-  font-size: 2.5rem;
-  width: 60px;
-  height: 60px;
+  font-size: 0.9rem;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.05);
+  background: #f9fafb;
   border-radius: 12px;
+  font-weight: 600;
+  color: var(--card-color);
 }
 
 .status-badge {
   background: var(--card-color);
   color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-size: 0.875rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.05em;
 }
 
 .card-content h3 {
-  font-size: 1.5rem;
+  font-size: 1.375rem;
   font-weight: 700;
-  margin-bottom: 0.5rem;
-  color: #1a202c;
+  margin-bottom: 0.75rem;
+  color: #111827;
 }
 
 .card-content p {
-  color: #4a5568;
+  color: #6b7280;
   line-height: 1.6;
   margin-bottom: 1.5rem;
+  font-size: 0.95rem;
 }
 
 .card-footer {
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
-  padding-top: 1rem;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 1.25rem;
 }
 
 .action-text {
   font-weight: 600;
   color: var(--card-color);
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 }
 
 .action-text.disabled {
-  color: #a0aec0;
+  color: #9ca3af;
 }
 
-.dashboard-footer {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  padding: 2rem;
-  margin-top: 2rem;
-}
 
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 2rem;
-  text-align: center;
-  color: white;
-}
-
-.stat h3 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-  color: white;
-}
-
-.stat p {
-  font-size: 1rem;
-  opacity: 0.8;
-  font-weight: 500;
-}
 
 @media (max-width: 768px) {
-  .dashboard-header h1 {
+  .welcome-content h1 {
     font-size: 2rem;
+  }
+  
+  .instruction-text {
+    font-size: 1rem;
   }
   
   .lms-grid {
@@ -176,8 +172,13 @@
     padding: 1.5rem;
   }
   
-  .stats {
-    grid-template-columns: 1fr;
-    gap: 1rem;
+
+  
+  .main-content {
+    padding: 1.5rem;
+  }
+  
+  .welcome-banner {
+    padding: 2rem 1.5rem;
   }
 }

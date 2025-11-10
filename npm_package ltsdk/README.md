@@ -50,3 +50,17 @@ A promise that resolves to the processed data.
 
 ## License
 Linux Foundation
+
+## Cleanup compiled artifacts
+
+If you accidentally committed `dist/` or compiled `.js`/`.d.ts` files, run:
+
+```bash
+cd "npm_package ltsdk"
+./scripts/clean-dist.sh
+git add -A
+git commit -m "chore(sdk): remove compiled artifacts"
+git push
+```
+
+Also ensure `.gitignore` contains `dist/` and `*.d.ts` (we added these earlier).

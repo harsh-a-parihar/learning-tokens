@@ -1,0 +1,32 @@
+{
+  "course": {
+    "id": "809246121636",
+    "name": "Distributed Algorithms",
+    "section": "2",
+    "studentCount": 1,
+    "enrollmentCode": "ursi7xjx"
+  },
+  "courseWork": [
+    {
+      "id": "809426520504",
+      "title": "Assignment_01",
+      "maxPoints": 100,
+      "workType": "courseWork",
+      "submissions": [
+        {
+          "userId": "107182406601304451483",
+          "assignedGrade": 50,
+          "updateTime": "2025-09-26T13:00:11.130Z",
+          "state": "RETURNED"
+        }
+      ]
+    }
+  ],
+  "students": [
+    {
+      "userId": "107182406601304451483",
+      "profile": { "name": { "fullName": "Harsh" }, "emailAddress": null },
+      "displayName": "Harsh"
+    }
+  ]
+}

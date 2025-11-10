@@ -152,3 +152,29 @@ export function run(
   clientSecret: string,
   meetingId: string
 ): Promise<any>;
+
+// ============================================================================
+// LMS SDK - Learning Management System Types and Functions
+// ============================================================================
+
+// Re-export all LMS normalized types
+export * from '../dist/src/types'
+
+// Validator
+export { validateNormalized } from '../dist/src/validator'
+
+// edX Connector & Adapter
+export { fetchEdxCourse, listEdxCourses } from '../dist/src/connectors/edx'
+export { normalizeEdx } from '../dist/src/adapters/edx'
+
+// Canvas Connector & Adapter
+export { fetchCanvasCourse, listCanvasCourses } from '../dist/src/connectors/canvas'
+export { normalizeCanvas } from '../dist/src/adapters/canvas'
+
+// Moodle Connector & Adapter
+export { fetchMoodleCourse, listMoodleCourses } from '../dist/src/connectors/moodle'
+export { normalizeMoodle } from '../dist/src/adapters/moodle'
+
+// Google Classroom Connector & Adapter
+export { fetchGoogleClassroomCourse, listGoogleClassroomCourses } from '../dist/src/connectors/googleClassroom'
+export { normalizeGoogleClassroom } from '../dist/src/adapters/googleClassroom'

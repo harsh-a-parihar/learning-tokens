@@ -1,0 +1,81 @@
+{
+  "source": {
+    "lms": "edx",
+    "rawCourseId": "course-v1:MIT+CS50+2025_T1",
+    "fetchedAt": "2025-10-10T12:47:09.063Z"
+  },
+  "institution": {
+    "id": "mit.edu",
+    "name": "MIT"
+  },
+  "course": {
+    "id": "course-v1:MIT+CS50+2025_T1",
+    "name": "CS50 Intro",
+    "startDate": "2025-09-01T00:00:00.000Z",
+    "endDate": "2025-12-15T00:00:00.000Z",
+    "metadata": {}
+  },
+  "instructors": [
+    {
+      "id": "i1",
+      "email": "inst1@mit.edu",
+      "username": "instructor1",
+      "name": "Prof A"
+    }
+  ],
+  "learners": [
+    {
+      "id": "u1",
+      "email": "student1@example.edu",
+      "username": "s1",
+      "name": "Student One",
+      "assignments": [
+        {
+          "id": "hw1",
+          "type": "assessment",
+          "title": "Homework 1",
+          "maxScore": 100,
+          "questions_count": 1,
+          "is_quiz_assignment": false,
+          "submissions": [
+            {
+              "workflow_state": "graded",
+              "grades": [
+                {
+                  "score": 90,
+                  "totalscore": 100,
+                  "percentage": 90
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u2",
+      "username": "s2",
+      "name": "Anon Two",
+      "assignments": []
+    }
+  ],
+  "chat": [
+    {
+      "channel": "forum",
+      "messages": [
+        {
+          "id": "m1",
+          "from": "s1",
+          "text": "Help please",
+          "ts": "2025-09-05T10:00:00.000Z"
+        }
+      ]
+    }
+  ],
+  "diagnostics": {
+    "missingEmailCount": 1,
+    "notes": [
+      "Some learners had no email and were identified by username or synthetic id"
+    ]
+  }
+}
