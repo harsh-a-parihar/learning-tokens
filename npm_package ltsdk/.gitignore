@@ -6,14 +6,24 @@ package-lock.json
 
 # Environment files
 .env
-.env.*
+.env.local
+.env.development
+.env.production
+!.env.example
+!env.example
 
 # Build outputs
 dist/
 build/
-*.js
-*.js.map
-*.d.ts
+# Compiled TypeScript in root and src (but allow frontend/*.js)
+/*.js
+/*.js.map
+/*.d.ts
+/src/**/*.js
+/src/**/*.js.map
+/src/**/*.d.ts
+/tests/**/*.js
+/tests/**/*.d.ts
 
 # Editor metadata
 .vscode/

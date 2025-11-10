@@ -14,9 +14,13 @@
   "scripts": {
   "clean": "rm -rf dist",
   "build": "npm run clean && tsc",
+  "build:frontend": "cd frontend && npm run build",
   "test": "jest",
   "smoke": "jest --testPathPattern=tests/smoke --runInBand",
-  "dev-server": "PORT=5001 node -r dotenv/config local-server/server.js"
+  "dev-server": "PORT=5001 node -r dotenv/config local-server/server.js",
+  "dev:frontend": "cd frontend && npm start",
+  "dev:all": "concurrently \"npm run dev-server\" \"npm run dev:frontend\"",
+  "install:frontend": "cd frontend && npm install"
   },
   "keywords": [
     "lms",
@@ -36,6 +40,7 @@
     "@types/jest": "^29.5.14",
     "@types/minimist": "^1.2.5",
     "@types/node": "^22.9.0",
+    "concurrently": "^8.2.2",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.5",
     "typescript": "^5.6.3"
