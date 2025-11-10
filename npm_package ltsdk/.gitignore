@@ -25,6 +25,9 @@ build/
 /tests/**/*.js
 /tests/**/*.d.ts
 
+# NPM package tarballs
+*.tgz
+
 # Editor metadata
 .vscode/
 .idea/

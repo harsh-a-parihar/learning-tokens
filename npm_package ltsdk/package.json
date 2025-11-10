@@ -8,9 +8,23 @@
     "dist",
     "types",
     "local-server",
+    "frontend/src",
+    "frontend/public",
+    "frontend/package.json",
+    "frontend/.env.example",
+    "frontend/README.md",
+    "env.example",
     "README.md",
     "README-SDK.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/harsh-a-parihar/learning-tokens.git"
+  },
+  "bugs": {
+    "url": "https://github.com/harsh-a-parihar/learning-tokens/issues"
+  },
+  "homepage": "https://github.com/harsh-a-parihar/learning-tokens#readme",
   "scripts": {
   "clean": "rm -rf dist",
   "build": "npm run clean && tsc",
