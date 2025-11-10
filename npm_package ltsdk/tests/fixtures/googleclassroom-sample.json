@@ -1,0 +1,10 @@
+{
+  "id": "gclass-123",
+  "name": "GClass Intro",
+  "startTime": "2025-01-10T00:00:00Z",
+  "endTime": "2025-05-10T00:00:00Z",
+  "owners": [ { "id": "t1", "emailAddress": "teacher@gclass.edu", "name": { "fullName": "Prof GC" } } ],
+  "students": [ { "userId": "s1", "emailAddress": "student@gclass.edu", "profile": { "name": "Student G" } } ],
+  "courseWork": [ { "id": "cw1", "title": "Quiz 1", "maxPoints": 10, "submissions": [ { "userId": "s1", "assignedGrade": 9, "updateTime": "2025-02-01T10:00:00Z" } ] } ],
+  "announcements": [ { "id": "ann1", "creator": { "id": "t1" }, "text": "Welcome!", "updateTime": "2025-01-11T09:00:00Z" } ]
+}

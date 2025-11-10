@@ -1,22 +1,7 @@
-// index.ts
-// Export edX LMS functions
-export {
-  getEdxUserProfile,
-  getEdxUserEnrollments,
-  getEdxCourseAssessments,
-  getEdxAssessmentQuestions,
-  getEdxAssessmentResponses,
-  getEdxCourseGrade,
-  getEdxCourseParticipants,
-  getEdxCourseInstructors,
-  getEdxAssessmentAttendance,
-  getEdxAssessmentAnalytics,
-  getEdxUserCertificate,
-  getEdxCourses,
-  getEdxAccessToken,
-  // Data processing functions
-  processEdxCourseData,
-  calculateEdxAssessmentScores,
-  aggregateEdxParticipantData,
-  processEdxData
-} from './edxDataprocessor';
+import { normalizeEdx } from './adapters/edx'
+export { normalizeEdx }
+export { validateNormalized } from './validator'
+export * from './types'
+
+// Convenience default
+export default { normalizeEdx }

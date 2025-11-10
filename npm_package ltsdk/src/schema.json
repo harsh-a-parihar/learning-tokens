@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Normalized LMS Payload",
+  "type": "object",
+  "required": ["source", "course"],
+  "properties": {
+    "source": {
+      "type": "object",
+      "required": ["lms","fetchedAt"],
+      "properties": {
+        "lms": {"type": "string"},
+        "rawCourseId": {"type": "string"},
+        "fetchedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "institution": {"type": "object"},
+    "course": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "startDate": {"type": "string"},
+        "endDate": {"type": "string"}
+      }
+    },
+    "instructors": {"type": "array"},
+    "learners": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "email": {"type": "string"},
+          "username": {"type": "string"},
+          "name": {"type": "string"},
+          "assignments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {"type": "string"},
+                "type": {"type": "string"},
+                "title": {"type": "string"},
+                "maxScore": {"type": "number"},
+                "question_count": {"type": "number"},
+                "is_quiz_assignment": {"type": "boolean"},
+                "quiz_id": {"type": ["string","number","null"]},
+                "submissions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "submitted_at": {"type": "string"},
+                      "workflow_state": {"type": "string"},
+                      "grades": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "score": {"type": ["number","null"]},
+                            "totalscore": {"type": ["number","null"]},
+                            "percentage": {"type": ["string","number","null"]}
+                          },
+                          "required": ["score","totalscore","percentage"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "transcript": {"type": "array"},
+    "chat": {"type": "array"},
+    "diagnostics": {"type": "object"}
+  }
+}

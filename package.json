@@ -1,0 +1,11 @@
+{
+  "name": "learning-tokens-root",
+  "private": true,
+  "scripts": {
+    "dev:local": "npm --prefix \"npm_package ltsdk\" run dev-server & npm --prefix frontend run start --silent",
+    "stop:dev": "(pkill -f \"local-server/server.js\" || true)"
+  },
+  "devDependencies": {
+    "dotenv": "^16.1.4"
+  }
+}

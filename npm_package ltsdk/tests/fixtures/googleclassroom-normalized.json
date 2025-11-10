@@ -1,0 +1,69 @@
+{
+  "source": {
+    "lms": "google-classroom",
+    "rawCourseId": "gclass-123",
+    "fetchedAt": "2025-10-10T12:47:09.064Z"
+  },
+  "course": {
+    "id": "gclass-123",
+    "name": "GClass Intro",
+    "startDate": "2025-01-10T00:00:00.000Z",
+    "endDate": "2025-05-10T00:00:00.000Z",
+    "metadata": {}
+  },
+  "instructors": [
+    {
+      "id": "t1",
+      "email": "teacher@gclass.edu",
+      "username": "teacher@gclass.edu",
+      "name": "Prof GC"
+    }
+  ],
+  "learners": [
+    {
+      "id": "s1",
+      "email": "student@gclass.edu",
+      "name": "Student G",
+      "username": "student@gclass.edu",
+      "assignments": [
+        {
+          "id": "cw1",
+          "type": "courseWork",
+          "title": "Quiz 1",
+          "maxScore": 10,
+          "is_quiz_assignment": false,
+          "submissions": [
+            {
+              "submitted_at": "2025-02-01T10:00:00.000Z",
+              "workflow_state": "unknown",
+              "grades": [
+                {
+                  "score": 9,
+                  "totalscore": 10,
+                  "percentage": 90
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "chat": [
+    {
+      "channel": "announcements",
+      "messages": [
+        {
+          "id": "ann1",
+          "from": "t1",
+          "text": "Welcome!",
+          "ts": "2025-01-11T09:00:00.000Z"
+        }
+      ]
+    }
+  ],
+  "diagnostics": {
+    "missingEmailCount": 0,
+    "notes": []
+  }
+}

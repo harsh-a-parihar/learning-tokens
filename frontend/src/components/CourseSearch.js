@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useCourseSearch } from '../hooks/useEdxData';
+import useCourseSearch from '../hooks/useCourseSearch';
+import Icon from './Icon';
 import './CourseSearch.css';
 
 const CourseSearch = ({ selectedCourseId, onCourseSelect, onCourseIdChange }) => {
@@ -9,7 +10,7 @@ const CourseSearch = ({ selectedCourseId, onCourseSelect, onCourseIdChange }) =>
   const searchRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  const { courses, loading, error } = useCourseSearch(searchQuery);
+  const { courses, loading, error } = useCourseSearch('edx', searchQuery);
 
   // Handle clicking outside to close dropdown
   useEffect(() => {
@@ -69,19 +70,19 @@ const CourseSearch = ({ selectedCourseId, onCourseSelect, onCourseIdChange }) =>
           placeholder="Search courses by name or ID (e.g., CS101, Introduction to Computer Science)"
           className="course-search-input"
         />
-        {loading && <div className="search-loading">🔍</div>}
+  {loading && <div className="search-loading" aria-hidden="true"><Icon name="search" size={16} /></div>}
       </div>
 
       {showDropdown && (
         <div className="search-dropdown" ref={dropdownRef}>
           {error ? (
             <div className="search-error">
-              <div className="error-icon">⚠️</div>
+              <div className="error-icon" aria-hidden="true"><Icon name="alert" size={16} /></div>
               <div className="error-text">Error searching courses: {error}</div>
             </div>
           ) : courses.length === 0 ? (
             <div className="search-no-results">
-              <div className="no-results-icon">🔍</div>
+              <div className="no-results-icon" aria-hidden="true"><Icon name="search" size={16} /></div>
               <div className="no-results-text">
                 {searchQuery.length < 2 
                   ? 'Type at least 2 characters to search' 
