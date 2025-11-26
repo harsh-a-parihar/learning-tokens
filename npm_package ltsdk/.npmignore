@@ -1,0 +1,49 @@
+# Source files (users get dist/)
+src/
+tests/
+scripts/
+
+# Development files
+.git/
+.gitignore
+.vscode/
+.idea/
+*.log
+*.tgz
+
+# Node modules (auto-excluded, but explicit)
+node_modules/
+frontend/node_modules/
+
+# Build outputs (except dist/ which is needed)
+frontend/build/
+*.js.map
+*.d.ts.map
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+
+# Runtime state files (user-generated, should not be published)
+*.auth.json
+!*.auth.json.example
+*.auth.json.bak
+configs.json
+!configs.json.example
+configs.json.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Lock files (users will generate their own)
+package-lock.json
+frontend/package-lock.json
+
+# IDE files
+*.swp
+*.swo
+*~
+

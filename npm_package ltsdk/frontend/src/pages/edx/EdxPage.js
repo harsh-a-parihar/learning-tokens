@@ -9,29 +9,52 @@ const EdxPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  const navigate = useNavigate()
+
   useEffect(() => {
     let mounted = true
-    const load = async () => {
-      setLoading(true)
-      setError(null)
+    const checkAndLoad = async () => {
+      // enforce session: only allow access if session.allowedLms === 'edx'
       try {
-        // Request the course index from the SDK. We intentionally don't
-        // provide a search UI — the dashboard will simply render available
-        // courses as cards.
-        const res = await lmsSdkClient.searchCourses('edx', '')
-        const list = (res && res.results) || res || []
-        if (mounted) setCourses(list)
+        const resp = await fetch('http://localhost:5002/auth/session', { credentials: 'include' })
+        if (!resp.ok) {
+          // not authenticated
+          return navigate('/lms-select')
+        }
+        const json = await resp.json()
+        if (!json || !json.authenticated) return navigate('/lms-select')
+        const allowed = json.session && json.session.allowedLms
+        if (allowed !== 'edx') {
+          // redirect to allowed LMS page if set, otherwise back to selection
+          if (allowed && typeof allowed === 'string' && allowed.trim()) return navigate(`/${allowed}`)
+          return navigate('/lms-select')
+        }
       } catch (e) {
-        if (mounted) setError(e && e.message ? e.message : String(e))
-      } finally {
-        if (mounted) setLoading(false)
+        return navigate('/lms-select')
       }
-    }
-    load()
-    return () => { mounted = false }
-  }, [])
 
-  const navigate = useNavigate()
+      const load = async () => {
+        setLoading(true)
+        setError(null)
+        try {
+          // Request the course index from the SDK. We intentionally don't
+          // provide a search UI — the dashboard will simply render available
+          // courses as cards.
+          const res = await lmsSdkClient.searchCourses('edx', '')
+          const list = (res && res.results) || res || []
+          if (mounted) setCourses(list)
+        } catch (e) {
+          if (mounted) setError(e && e.message ? e.message : String(e))
+        } finally {
+          if (mounted) setLoading(false)
+        }
+      }
+      load()
+      return () => { mounted = false }
+    }
+    checkAndLoad()
+    return () => { mounted = false }
+  }, [navigate])
 
   return (
     <div className="edx-page">
@@ -39,16 +62,16 @@ const EdxPage = () => {
         <div className="edx-container">
           <div className="edx-header-banner">
             <div className="edx-banner-content">
-              <h1>Welcome to Open edX LMS</h1>
-              <p className="edx-subtitle">Manage your courses and connect with students</p>
+              <h1>Explore the courses in your library!!</h1>
+              <p className="edx-subtitle">Manage your course details and grant Learning Tokens to learners.</p>
             </div>
           </div>
-          
+
           <div className="edx-content">
             <div className="courses-grid">
               {loading ? (
                 // show 3 skeleton cards while loading
-                [1,2,3].map(i => <div key={i} className="skeleton" />)
+                [1, 2, 3].map(i => <div key={i} className="skeleton" />)
               ) : error ? (
                 <div className="error">Error loading courses: {error}</div>
               ) : courses.length === 0 ? (

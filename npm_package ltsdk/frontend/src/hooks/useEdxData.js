@@ -43,7 +43,7 @@ export const useCourseSearch = (query, debounceMs = 300) => {
   }, [])
 
   // simple debounce via timeout inside effect
-  useCallback(() => {}, [])
+  useCallback(() => { }, [])
 
   // effect-like debounce implemented by consumers (we keep same exported shape)
   return { courses, loading, error, searchCourses }

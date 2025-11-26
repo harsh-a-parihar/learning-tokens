@@ -86,14 +86,16 @@ body {
 
 /* Layout for sidebar + main */
 .lt-main {
-  margin-left: 250px; /* width of sidebar */
+  margin-left: 280px; /* width of sidebar */
   min-height: 100vh;
   box-sizing: border-box;
+  width: calc(100% - 280px);
 }
 
-@media (max-width: 700px) {
+@media (max-width: 768px) {
   .lt-main {
     margin-left: 0;
+    width: 100%;
   }
   .lt-sidebar {
     display: none;

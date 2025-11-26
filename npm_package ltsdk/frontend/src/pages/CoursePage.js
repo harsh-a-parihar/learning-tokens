@@ -6,7 +6,7 @@ import '../components/EdxPage.css'
 // Progress Bar Component
 const ProgressBar = ({ steps, currentStep }) => {
   return (
-    <div style={{ 
+    <div style={{
       background: '#ffffff',
       padding: '2rem',
       borderRadius: '16px',
@@ -14,7 +14,7 @@ const ProgressBar = ({ steps, currentStep }) => {
       boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
       border: '1px solid #e5e7eb'
     }}>
-      <div style={{ 
+      <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -22,7 +22,7 @@ const ProgressBar = ({ steps, currentStep }) => {
       }}>
         {steps.map((step, index) => (
           <React.Fragment key={step.id}>
-            <div style={{ 
+            <div style={{
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -72,7 +72,7 @@ const ProgressBar = ({ steps, currentStep }) => {
 }
 
 const Section = ({ title, children }) => (
-  <section style={{ 
+  <section style={{
     marginBottom: 24,
     background: '#fff',
     border: '1px solid #e5e7eb',
@@ -80,9 +80,9 @@ const Section = ({ title, children }) => (
     overflow: 'hidden',
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
   }}>
-    <h3 style={{ 
-      margin: 0, 
-      fontSize: '1.25rem', 
+    <h3 style={{
+      margin: 0,
+      fontSize: '1.25rem',
       fontWeight: '600',
       color: '#111827',
       padding: '1.5rem 2rem',
@@ -144,7 +144,7 @@ export default function CoursePage() {
         console.log('Loading course data for:', { lms, courseId })
         const res = await lmsSdkClient.getNormalizedCourse(lms, courseId)
         console.log('Raw API response:', res)
-        
+
         // Normalize possible SDK response shapes into a single course object.
         const processed = (() => {
           if (res == null) return null
@@ -227,65 +227,14 @@ export default function CoursePage() {
     URL.revokeObjectURL(url)
   }
 
-  const downloadCSV = () => {
-    if (!course) return
-    
-    // Create CSV content
-    let csvContent = 'Category,Field,Value\n'
-    
-    // Course Information
-    const courseMeta = course.course || {}
-    csvContent += `Course,ID,${courseMeta.id || ''}\n`
-    csvContent += `Course,Name,${(courseMeta.name || '').replace(/,/g, ';')}\n`
-    csvContent += `Course,Start Date,${courseMeta.startDate || ''}\n`
-    csvContent += `Course,End Date,${courseMeta.endDate || ''}\n`
-    csvContent += `Course,Description,${(courseMeta.description || courseMeta.short_description || '').replace(/,/g, ';').replace(/\n/g, ' ')}\n`
-    csvContent += '\n'
-    
-    // Instructors
-    const instructors = course.instructors || []
-    csvContent += 'Instructors,Count,' + instructors.length + '\n'
-    instructors.forEach((inst, idx) => {
-      csvContent += `Instructor ${idx + 1},ID,${inst.instructor_id || ''}\n`
-      csvContent += `Instructor ${idx + 1},Name,${(inst.instructor_name || '').replace(/,/g, ';')}\n`
-      csvContent += `Instructor ${idx + 1},Email,${inst.instructor_email || ''}\n`
-    })
-    csvContent += '\n'
-    
-    // Students Summary
-    const learners = course.learners || []
-    csvContent += 'Students,Count,' + learners.length + '\n'
-    csvContent += 'Student ID,Student Name,Student Email,Assignments Count,Average Score\n'
-    learners.forEach(learner => {
-      const assignments = learner.assignments || []
-      const totalScore = assignments.reduce((sum, asn) => {
-        const submission = asn.submissions?.[0]
-        const grade = submission?.grades?.[0]
-        return sum + (grade?.percentage || 0)
-      }, 0)
-      const avgScore = assignments.length > 0 ? (totalScore / assignments.length).toFixed(2) : 'N/A'
-      
-      csvContent += `${learner.id || ''},${(learner.name || '').replace(/,/g, ';')},${learner.email || ''},${assignments.length},${avgScore}\n`
-    })
-    
-    // Create and download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${lms}-${courseId}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   const downloadPDF = () => {
     if (!course) return
-    
+
     // Create a printable HTML page
     const courseMeta = course.course || {}
     const instructors = course.instructors || []
     const learners = course.learners || []
-    
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -364,15 +313,15 @@ export default function CoursePage() {
             </thead>
             <tbody>
               ${learners.map(learner => {
-                const assignments = learner.assignments || []
-                const totalScore = assignments.reduce((sum, asn) => {
-                  const submission = asn.submissions?.[0]
-                  const grade = submission?.grades?.[0]
-                  return sum + (grade?.percentage || 0)
-                }, 0)
-                const avgScore = assignments.length > 0 ? (totalScore / assignments.length).toFixed(2) + '%' : 'N/A'
-                
-                return `
+      const assignments = learner.assignments || []
+      const totalScore = assignments.reduce((sum, asn) => {
+        const submission = asn.submissions?.[0]
+        const grade = submission?.grades?.[0]
+        return sum + (grade?.percentage || 0)
+      }, 0)
+      const avgScore = assignments.length > 0 ? (totalScore / assignments.length).toFixed(2) + '%' : 'N/A'
+
+      return `
                   <tr>
                     <td>${learner.id || 'N/A'}</td>
                     <td>${learner.name || 'N/A'}</td>
@@ -381,7 +330,7 @@ export default function CoursePage() {
                     <td>${avgScore}</td>
                   </tr>
                 `
-              }).join('')}
+    }).join('')}
             </tbody>
           </table>
         ` : '<p>No students found</p>'}
@@ -393,12 +342,12 @@ export default function CoursePage() {
       </body>
       </html>
     `
-    
+
     // Open in new window and trigger print
     const printWindow = window.open('', '_blank')
     printWindow.document.write(htmlContent)
     printWindow.document.close()
-    
+
     // Wait for content to load, then print
     printWindow.onload = () => {
       setTimeout(() => {
@@ -407,7 +356,69 @@ export default function CoursePage() {
     }
   }
 
-  if (loading) return <div className="page-loading">Loading...</div>
+  // Learning Tokens backend URL (where the normalized payload will be POSTed)
+  const LT_BACKEND = process.env.REACT_APP_LT_BACKEND_URL || 'http://localhost:3001'
+  const [sendingToLT, setSendingToLT] = useState(false)
+
+  const sendCourseToLearningTokens = async () => {
+    if (!course) return
+    setSendingToLT(true)
+    try {
+      const url = `${LT_BACKEND.replace(/\/$/, '')}/api/sdk/import`
+      const sdkBase = process.env.REACT_APP_SDK_BASE_URL || 'http://localhost:5001'
+      const logUrl = `${sdkBase.replace(/\/$/, '')}/api/log`
+
+      // Log to backend terminal via SDK server (non-blocking, no credentials needed)
+      try {
+        await fetch(logUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(course)
+        }).catch(() => {
+          // Ignore errors - logging is non-critical
+        })
+      } catch (logErr) {
+        // Ignore logging errors
+      }
+
+      // POST normalized payload to Learning Tokens backend
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(course)
+      })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`Failed to send payload: ${res.status} ${res.statusText} ${text}`)
+      }
+
+      // Show success message — do NOT redirect (backend integration may come later)
+      console.info('Payload sent successfully to Learning Tokens backend:', url)
+    } catch (e) {
+      console.warn('Error sending course to Learning Tokens backend (saving locally):', e)
+      // Save payload locally so it can be retried/imported later when backend is available
+      try {
+        const key = `ltsdk_pending_import_${lms}_${courseId}`
+        localStorage.setItem(key, JSON.stringify({ course, createdAt: new Date().toISOString() }))
+        console.info(`Saved pending import to localStorage key=${key}`)
+      } catch (se) {
+        console.warn('Failed to save pending import to localStorage:', se)
+      }
+    } finally {
+      setSendingToLT(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="page-loading-container">
+        <div className="loading-spinner-wrapper">
+          <div className="loading-spinner"></div>
+          <p className="loading-text">Loading course data...</p>
+        </div>
+      </div>
+    )
+  }
   if (error) return <div className="page-error">Error: {error}</div>
   if (!course) return <div className="page-empty">No course data</div>
 
@@ -454,34 +465,34 @@ export default function CoursePage() {
     <Section title="Course Information">
       {/* Course Description */}
       {(courseMeta.metadata?.short_description || courseMeta.short_description || courseMeta.description || course.description) && (
-        <div style={{ 
+        <div style={{
           marginBottom: '2rem',
           padding: '1.5rem',
           background: '#f8fafc',
           border: '1px solid #f1f5f9',
           borderRadius: '12px'
         }}>
-          <h4 style={{ 
-            margin: '0 0 0.75rem 0', 
-            fontSize: '1rem', 
-            fontWeight: '600', 
-            color: '#374151' 
+          <h4 style={{
+            margin: '0 0 0.75rem 0',
+            fontSize: '1rem',
+            fontWeight: '600',
+            color: '#374151'
           }}>Description</h4>
-          <div style={{ 
-            color: '#334155', 
-            fontSize: '0.95rem', 
-            lineHeight: 1.6 
+          <div style={{
+            color: '#334155',
+            fontSize: '0.95rem',
+            lineHeight: 1.6
           }}>
             {courseMeta.metadata?.short_description || courseMeta.short_description || courseMeta.description || course.description}
           </div>
         </div>
       )}
-      
+
       {/* Course Details Grid */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-        gap: '1.5rem' 
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+        gap: '1.5rem'
       }}>
         <div style={{
           padding: '1.25rem',
@@ -489,17 +500,17 @@ export default function CoursePage() {
           border: '1px solid #e5e7eb',
           borderRadius: '12px'
         }}>
-          <div style={{ 
-            fontSize: '0.875rem', 
-            fontWeight: '600', 
-            color: '#6b7280', 
+          <div style={{
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            color: '#6b7280',
             marginBottom: '0.5rem',
             textTransform: 'uppercase',
             letterSpacing: '0.05em'
           }}>Course ID</div>
-          <div style={{ 
-            color: '#111827', 
-            fontFamily: 'monospace', 
+          <div style={{
+            color: '#111827',
+            fontFamily: 'monospace',
             fontSize: '0.875rem',
             fontWeight: '500',
             wordBreak: 'break-all'
@@ -514,16 +525,16 @@ export default function CoursePage() {
           border: '1px solid #e5e7eb',
           borderRadius: '12px'
         }}>
-          <div style={{ 
-            fontSize: '0.875rem', 
-            fontWeight: '600', 
-            color: '#6b7280', 
+          <div style={{
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            color: '#6b7280',
             marginBottom: '0.5rem',
             textTransform: 'uppercase',
             letterSpacing: '0.05em'
           }}>Organization</div>
-          <div style={{ 
-            color: '#111827', 
+          <div style={{
+            color: '#111827',
             fontSize: '1rem',
             fontWeight: '600'
           }}>
@@ -537,16 +548,16 @@ export default function CoursePage() {
           border: '1px solid #e5e7eb',
           borderRadius: '12px'
         }}>
-          <div style={{ 
-            fontSize: '0.875rem', 
-            fontWeight: '600', 
-            color: '#6b7280', 
+          <div style={{
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            color: '#6b7280',
             marginBottom: '0.5rem',
             textTransform: 'uppercase',
             letterSpacing: '0.05em'
           }}>Course Number</div>
-          <div style={{ 
-            color: '#111827', 
+          <div style={{
+            color: '#111827',
             fontSize: '1rem',
             fontWeight: '600'
           }}>
@@ -560,15 +571,15 @@ export default function CoursePage() {
           border: '1px solid #e5e7eb',
           borderRadius: '12px'
         }}>
-          <div style={{ 
-            fontSize: '0.875rem', 
-            fontWeight: '600', 
-            color: '#6b7280', 
+          <div style={{
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            color: '#6b7280',
             marginBottom: '0.5rem',
             textTransform: 'uppercase',
             letterSpacing: '0.05em'
           }}>Status</div>
-          <div style={{ 
+          <div style={{
             display: 'inline-block',
             padding: '0.375rem 0.75rem',
             background: '#dcfce7',
@@ -587,22 +598,22 @@ export default function CoursePage() {
           border: '1px solid #e5e7eb',
           borderRadius: '12px'
         }}>
-          <div style={{ 
-            fontSize: '0.875rem', 
-            fontWeight: '600', 
-            color: '#6b7280', 
+          <div style={{
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            color: '#6b7280',
             marginBottom: '0.5rem',
             textTransform: 'uppercase',
             letterSpacing: '0.05em'
           }}>Start Date</div>
-          <div style={{ 
-            color: '#111827', 
+          <div style={{
+            color: '#111827',
             fontSize: '0.95rem',
             fontWeight: '500'
           }}>
             {courseMeta.startDate ? new Date(courseMeta.startDate).toLocaleDateString('en-US', {
               year: 'numeric',
-              month: 'long', 
+              month: 'long',
               day: 'numeric'
             }) : (courseMeta.start || course.start_date || course.start || '—')}
           </div>
@@ -614,22 +625,22 @@ export default function CoursePage() {
           border: '1px solid #e5e7eb',
           borderRadius: '12px'
         }}>
-          <div style={{ 
-            fontSize: '0.875rem', 
-            fontWeight: '600', 
-            color: '#6b7280', 
+          <div style={{
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            color: '#6b7280',
             marginBottom: '0.5rem',
             textTransform: 'uppercase',
             letterSpacing: '0.05em'
           }}>End Date</div>
-          <div style={{ 
-            color: '#111827', 
+          <div style={{
+            color: '#111827',
             fontSize: '0.95rem',
             fontWeight: '500'
           }}>
             {courseMeta.endDate ? new Date(courseMeta.endDate).toLocaleDateString('en-US', {
               year: 'numeric',
-              month: 'long', 
+              month: 'long',
               day: 'numeric'
             }) : (courseMeta.end || course.end_date || course.end || '—')}
           </div>
@@ -638,21 +649,21 @@ export default function CoursePage() {
 
       {/* Additional Metadata if available */}
       {course.source && (
-        <div style={{ 
+        <div style={{
           marginTop: '2rem',
           padding: '1rem',
           background: '#fef3c7',
           border: '1px solid #f59e0b',
           borderRadius: '8px'
         }}>
-          <div style={{ 
-            fontSize: '0.875rem', 
-            fontWeight: '600', 
+          <div style={{
+            fontSize: '0.875rem',
+            fontWeight: '600',
             color: '#92400e',
             marginBottom: '0.5rem'
           }}>Data Source Information</div>
-          <div style={{ 
-            fontSize: '0.8rem', 
+          <div style={{
+            fontSize: '0.8rem',
             color: '#92400e',
             fontFamily: 'monospace'
           }}>
@@ -666,8 +677,8 @@ export default function CoursePage() {
   const renderInstructors = () => (
     <Section title={`Instructors (${instructors.length})`}>
       {instructors.length === 0 ? (
-        <div style={{ 
-          color:'#9ca3af', 
+        <div style={{
+          color: '#9ca3af',
           fontStyle: 'italic',
           textAlign: 'center',
           padding: '3rem'
@@ -699,16 +710,16 @@ export default function CoursePage() {
   const renderStudents = () => (
     <Section title={`Enrolled Students (${students.length})`}>
       {students.length === 0 ? (
-        <div style={{ 
-          color:'#9ca3af', 
+        <div style={{
+          color: '#9ca3af',
           fontStyle: 'italic',
           textAlign: 'center',
           padding: '3rem'
         }}>No students available</div>
       ) : (
-        <div style={{ 
-          maxHeight: '400px', 
-          overflow: 'auto', 
+        <div style={{
+          maxHeight: '400px',
+          overflow: 'auto',
           display: 'grid',
           gap: '1rem'
         }}>
@@ -720,16 +731,16 @@ export default function CoursePage() {
               border: '1px solid #e5e7eb',
               boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
             }}>
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                gap: '1rem' 
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '1rem'
               }}>
                 <div>
-                  <div style={{ 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
-                    color: '#6b7280', 
+                  <div style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em'
@@ -740,16 +751,16 @@ export default function CoursePage() {
                 </div>
 
                 <div>
-                  <div style={{ 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
-                    color: '#6b7280', 
+                  <div style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em'
                   }}>Username</div>
-                  <div style={{ 
-                    color: '#374151', 
+                  <div style={{
+                    color: '#374151',
                     fontSize: '0.875rem',
                     fontFamily: 'monospace',
                     fontWeight: '500'
@@ -759,16 +770,16 @@ export default function CoursePage() {
                 </div>
 
                 <div>
-                  <div style={{ 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
-                    color: '#6b7280', 
+                  <div style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em'
                   }}>Email</div>
-                  <div style={{ 
-                    color: '#374151', 
+                  <div style={{
+                    color: '#374151',
                     fontSize: '0.875rem',
                     fontWeight: '500'
                   }}>
@@ -777,17 +788,17 @@ export default function CoursePage() {
                 </div>
 
                 <div>
-                  <div style={{ 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
-                    color: '#6b7280', 
+                  <div style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em'
                   }}>Student ID</div>
-                  <div style={{ 
-                    color: '#374151', 
-                    fontSize: '0.875rem', 
+                  <div style={{
+                    color: '#374151',
+                    fontSize: '0.875rem',
                     fontFamily: 'monospace',
                     fontWeight: '500'
                   }}>
@@ -796,22 +807,22 @@ export default function CoursePage() {
                 </div>
 
                 <div>
-                  <div style={{ 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
-                    color: '#6b7280', 
+                  <div style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em'
                   }}>Enrolled Date</div>
-                  <div style={{ 
-                    color: '#374151', 
+                  <div style={{
+                    color: '#374151',
                     fontSize: '0.875rem',
                     fontWeight: '500'
                   }}>
                     {s.time_enrolled ? new Date(s.time_enrolled).toLocaleDateString('en-US', {
                       year: 'numeric',
-                      month: 'short', 
+                      month: 'short',
                       day: 'numeric'
                     }) : '—'}
                   </div>
@@ -819,15 +830,15 @@ export default function CoursePage() {
 
                 {/* Placeholder for future use */}
                 <div style={{ opacity: 0.5 }}>
-                  <div style={{ 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
-                    color: '#6b7280', 
+                  <div style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em'
                   }}>Status</div>
-                  <div style={{ 
+                  <div style={{
                     display: 'inline-block',
                     padding: '0.25rem 0.5rem',
                     background: '#dcfce7',
@@ -850,8 +861,8 @@ export default function CoursePage() {
   const renderAssignments = () => (
     <Section title="Assignments">
       {students.length === 0 ? (
-        <div style={{ 
-          color:'#9ca3af', 
+        <div style={{
+          color: '#9ca3af',
           fontStyle: 'italic',
           textAlign: 'center',
           padding: '3rem'
@@ -959,7 +970,7 @@ export default function CoursePage() {
                       'not_attempted': { bg: '#f3f4f6', color: '#6b7280', border: '#e5e7eb' }
                     }
                     const statusStyle = statusColors[status] || statusColors['not_attempted']
-                    
+
                     const scoreData = sub && sub.grades && sub.grades.length ? {
                       score: sub.grades[0].score || 0,
                       total: sub.grades[0].totalscore || a.maxScore || 0, // Use maxScore as fallback for correct denominator
@@ -1008,7 +1019,7 @@ export default function CoursePage() {
                                 {assignmentType}{isQuiz ? ' • Quiz' : ''}
                               </div>
                             </div>
-                            
+
                             {a.subsection_name && (
                               <p style={{
                                 margin: '0 0 0.5rem 0',
@@ -1019,7 +1030,7 @@ export default function CoursePage() {
                                 {a.subsection_name}
                               </p>
                             )}
-                            
+
                             <div style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -1034,7 +1045,7 @@ export default function CoursePage() {
                                   <span>
                                     {expandedIds.has(a.id) ? a.id : truncateId(a.id)}
                                     {a.id.length > 8 && (
-                                      <button 
+                                      <button
                                         onClick={() => toggleIdExpansion(a.id)}
                                         style={{
                                           background: 'none',
@@ -1119,13 +1130,13 @@ export default function CoursePage() {
   const renderReview = () => (
     <Section title="Review & Confirm">
       <div style={{ marginBottom: '2rem' }}>
-        
+
         {/* Course Information */}
         <div style={{ marginBottom: '2rem', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1.5rem' }}>
-          <h4 style={{ 
-            color: '#374151', 
-            marginBottom: '1rem', 
-            borderBottom: '1px solid #e5e7eb', 
+          <h4 style={{
+            color: '#374151',
+            marginBottom: '1rem',
+            borderBottom: '1px solid #e5e7eb',
             paddingBottom: '0.5rem',
             display: 'flex',
             justifyContent: 'space-between',
@@ -1180,10 +1191,10 @@ export default function CoursePage() {
 
         {/* Instructors Summary */}
         <div style={{ marginBottom: '2rem', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1.5rem' }}>
-          <h4 style={{ 
-            color: '#374151', 
-            marginBottom: '1rem', 
-            borderBottom: '1px solid #e5e7eb', 
+          <h4 style={{
+            color: '#374151',
+            marginBottom: '1rem',
+            borderBottom: '1px solid #e5e7eb',
             paddingBottom: '0.5rem',
             display: 'flex',
             justifyContent: 'space-between',
@@ -1214,15 +1225,15 @@ export default function CoursePage() {
             <div style={{ display: 'grid', gap: '0.75rem' }}>
               {instructors.slice(0, 5).map((instructor, index) => (
                 <div key={index} style={{ display: 'flex', alignItems: 'center', padding: '0.5rem', background: '#f9fafb', borderRadius: '4px' }}>
-                  <div style={{ 
-                    width: '32px', 
-                    height: '32px', 
-                    borderRadius: '50%', 
-                    background: '#10b981', 
-                    color: 'white', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: '#10b981',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     fontWeight: '600',
                     marginRight: '0.75rem',
                     fontSize: '0.875rem'
@@ -1246,10 +1257,10 @@ export default function CoursePage() {
 
         {/* Students Summary */}
         <div style={{ marginBottom: '2rem', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1.5rem' }}>
-          <h4 style={{ 
-            color: '#374151', 
-            marginBottom: '1rem', 
-            borderBottom: '1px solid #e5e7eb', 
+          <h4 style={{
+            color: '#374151',
+            marginBottom: '1rem',
+            borderBottom: '1px solid #e5e7eb',
             paddingBottom: '0.5rem',
             display: 'flex',
             justifyContent: 'space-between',
@@ -1280,15 +1291,15 @@ export default function CoursePage() {
             <div style={{ display: 'grid', gap: '0.75rem' }}>
               {students.slice(0, 5).map((student, index) => (
                 <div key={index} style={{ display: 'flex', alignItems: 'center', padding: '0.5rem', background: '#f9fafb', borderRadius: '4px' }}>
-                  <div style={{ 
-                    width: '32px', 
-                    height: '32px', 
-                    borderRadius: '50%', 
-                    background: '#3b82f6', 
-                    color: 'white', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: '#3b82f6',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     fontWeight: '600',
                     marginRight: '0.75rem',
                     fontSize: '0.875rem'
@@ -1315,10 +1326,10 @@ export default function CoursePage() {
 
         {/* Assignments Summary */}
         <div style={{ marginBottom: '2rem', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1.5rem' }}>
-          <h4 style={{ 
-            color: '#374151', 
-            marginBottom: '1rem', 
-            borderBottom: '1px solid #e5e7eb', 
+          <h4 style={{
+            color: '#374151',
+            marginBottom: '1rem',
+            borderBottom: '1px solid #e5e7eb',
             paddingBottom: '0.5rem',
             display: 'flex',
             justifyContent: 'space-between',
@@ -1362,7 +1373,7 @@ export default function CoursePage() {
               })
               return acc
             }, [])
-            
+
             return allAssignments.length === 0 ? (
               <p style={{ color: '#6b7280', fontStyle: 'italic' }}>No assignments found for this course.</p>
             ) : (
@@ -1418,18 +1429,18 @@ export default function CoursePage() {
         </div>
 
         {/* Confirmation Section */}
-        <div style={{ 
-          padding: '1rem', 
-          background: '#fef3c7', 
-          border: '1px solid #f59e0b', 
+        <div style={{
+          padding: '1rem',
+          background: '#fef3c7',
+          border: '1px solid #f59e0b',
           borderRadius: '8px',
           marginBottom: '1.5rem'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <input 
-              type="checkbox" 
-              id="confirm" 
-              checked={confirmed} 
+            <input
+              type="checkbox"
+              id="confirm"
+              checked={confirmed}
               onChange={(e) => setConfirmed(e.target.checked)}
               style={{ transform: 'scale(1.2)' }}
             />
@@ -1447,10 +1458,10 @@ export default function CoursePage() {
 
   const renderTokenAssignment = () => (
     <Section title="Assign Learning Tokens">
-      <div style={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
         justifyContent: 'center',
         padding: '3rem 2rem',
         textAlign: 'center'
@@ -1463,16 +1474,16 @@ export default function CoursePage() {
           marginBottom: '1rem'
         }}>
           {/* Learning Tokens Logo */}
-          <img 
-            src="/img/lt.png" 
-            alt="Learning Tokens Logo" 
+          <img
+            src="/img/lt.png"
+            alt="Learning Tokens Logo"
             style={{
               width: '120px',
               height: '120px',
               objectFit: 'contain'
             }}
           />
-          
+
           {/* Arrow */}
           <div style={{
             fontSize: '3rem',
@@ -1481,7 +1492,7 @@ export default function CoursePage() {
           }}>
             ➜
           </div>
-          
+
           {/* Token Icon */}
           <div style={{
             fontSize: '4rem'
@@ -1518,7 +1529,7 @@ export default function CoursePage() {
           marginBottom: '2rem',
           lineHeight: '1.6'
         }}>
-          You'll be redirected to the Learning Tokens Dashboard where you can distribute blockchain-based tokens 
+          You'll be redirected to the Learning Tokens Dashboard where you can distribute blockchain-based tokens
           to students based on their course performance and achievements.
         </p>
 
@@ -1558,12 +1569,8 @@ export default function CoursePage() {
 
         {/* Action Button */}
         <button
-          onClick={() => {
-            // TODO: Navigate to dashboard with course data
-            console.log('Navigating to Learning Tokens Dashboard...')
-            // You can add actual navigation logic here
-            // Example: window.location.href = `/dashboard/tokens?lms=${lms}&courseId=${courseId}`
-          }}
+          onClick={() => sendCourseToLearningTokens()}
+          disabled={!confirmed || sendingToLT}
           style={{
             background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
             color: '#ffffff',
@@ -1580,15 +1587,19 @@ export default function CoursePage() {
             gap: '0.5rem'
           }}
           onMouseEnter={(e) => {
-            e.target.style.transform = 'translateY(-2px)'
-            e.target.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.4)'
+            if (!e.target.disabled) {
+              e.target.style.transform = 'translateY(-2px)'
+              e.target.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.4)'
+            }
           }}
           onMouseLeave={(e) => {
-            e.target.style.transform = 'translateY(0)'
-            e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)'
+            if (!e.target.disabled) {
+              e.target.style.transform = 'translateY(0)'
+              e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)'
+            }
           }}
         >
-          Go to Learning Tokens Dashboard
+          {sendingToLT ? 'Sending…' : 'Go to Learning Tokens Dashboard'}
           <span style={{ fontSize: '1.25rem' }}>→</span>
         </button>
 
@@ -1605,17 +1616,17 @@ export default function CoursePage() {
   )
 
   return (
-    <div className="course-page" style={{ 
-      minHeight: '100vh', 
+    <div className="course-page" style={{
+      minHeight: '100vh',
       background: '#ffffff',
       padding: '2rem'
     }}>
       <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           marginBottom: '2rem',
           background: '#fff',
           padding: '2rem',
@@ -1653,21 +1664,21 @@ export default function CoursePage() {
               title="Back to LMS"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m12 19-7-7 7-7"/>
-                <path d="M19 12H5"/>
+                <path d="m12 19-7-7 7-7" />
+                <path d="M19 12H5" />
               </svg>
             </button>
             <div>
-              <h1 style={{ 
-                margin: 0, 
-                fontSize: '2rem', 
-                fontWeight: '700', 
+              <h1 style={{
+                margin: 0,
+                fontSize: '2rem',
+                fontWeight: '700',
                 color: '#111827',
                 lineHeight: 1.2
               }}>{courseMeta.name || courseMeta.display_name || 'Course'}</h1>
-              <div style={{ 
-                color: '#64748b', 
-                fontSize: '1rem', 
+              <div style={{
+                color: '#64748b',
+                fontSize: '1rem',
                 marginTop: '0.5rem',
                 fontWeight: '500'
               }}>
@@ -1678,7 +1689,7 @@ export default function CoursePage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button 
+            <button
               onClick={downloadJson}
               style={{
                 background: '#ffffff',
@@ -1704,14 +1715,14 @@ export default function CoursePage() {
               }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="12" y1="18" x2="12" y2="12"/>
-                <line x1="9" y1="15" x2="15" y2="15"/>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="12" y1="18" x2="12" y2="12" />
+                <line x1="9" y1="15" x2="15" y2="15" />
               </svg>
               JSON
             </button>
-            <button 
+            <button
               onClick={downloadPDF}
               style={{
                 background: '#ffffff',
@@ -1737,11 +1748,11 @@ export default function CoursePage() {
               }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-                <polyline points="10 9 9 9 8 9"/>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
               </svg>
               PDF
             </button>
@@ -1757,9 +1768,9 @@ export default function CoursePage() {
         </div>
 
         {/* Navigation Buttons */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
           background: '#fff',
           padding: '1.5rem 2rem',
@@ -1767,7 +1778,7 @@ export default function CoursePage() {
           boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
           border: '1px solid #e5e7eb'
         }}>
-          <button 
+          <button
             onClick={prevStep}
             disabled={currentStep === 0}
             style={{
@@ -1794,7 +1805,7 @@ export default function CoursePage() {
             <div style={{ width: '120px' }}></div>
           ) : currentStep === steps.length - 2 ? (
             // Review step - Next button enabled only when confirmed
-            <button 
+            <button
               onClick={nextStep}
               disabled={!confirmed}
               style={{
@@ -1813,7 +1824,7 @@ export default function CoursePage() {
             </button>
           ) : (
             // All other steps - regular Next button
-            <button 
+            <button
               onClick={nextStep}
               style={{
                 background: '#0066cc',

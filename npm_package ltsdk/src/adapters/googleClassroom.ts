@@ -1,32 +1,29 @@
-import { NormalizedPayload } from '../types'
+import { NormalizedPayload, Course, Grade } from '../types'
+import { ensureIso, createDiagnostics } from '../utils'
 
 type RawGClassCourse = any
 
-function ensureIso(ts?: string | number): string | undefined {
-  if (!ts) return undefined
-  const d = new Date(ts)
-  return isNaN(d.getTime()) ? undefined : d.toISOString()
-}
-
 export async function normalizeGoogleClassroom(raw: RawGClassCourse): Promise<NormalizedPayload> {
-  if (process.env.LTSDK_DEBUG) {
+  if (process.env.LTSDK_DEBUG === 'true') {
     console.log('[Google Classroom Adapter] Raw data keys:', Object.keys(raw || {}))
     console.log('[Google Classroom Adapter] Raw owners:', raw?.owners || 'undefined')
-    console.log('[Google Classroom Adapter] Raw teachers:', raw?.teachers || 'undefined') 
+    console.log('[Google Classroom Adapter] Raw teachers:', raw?.teachers || 'undefined')
     console.log('[Google Classroom Adapter] Raw students:', raw?.students || 'undefined')
   }
-  
+
   const source = { lms: 'google-classroom' as const, rawCourseId: raw?.course?.id?.toString?.() || raw?.id?.toString?.(), fetchedAt: new Date().toISOString() }
 
   const institution = raw?.courseState?.organization ? { id: raw.courseState.organization.id?.toString?.() || undefined, name: raw.courseState.organization.name } : undefined
 
-  const course = {
-    id: raw?.course?.id?.toString?.() || raw?.id?.toString?.() || raw?.courseId || 'unknown',
+  const courseId = raw?.course?.id ?? raw?.id ?? raw?.courseId
+  const normalizedCourseId = courseId !== undefined && courseId !== null ? String(courseId) : 'NA'
+  const course: Course = ({
+    id: normalizedCourseId,
     name: raw?.course?.name || raw?.name || raw?.title,
     startDate: ensureIso(raw?.startTime) || undefined,
     endDate: ensureIso(raw?.endTime) || undefined,
     metadata: raw?.course?.section ? { section: raw.course.section } : raw?.section ? { section: raw.section } : {}
-  }
+  }) as Course
 
   // enrich metadata with enrollmentCode and student count when available
   try {
@@ -36,11 +33,11 @@ export async function normalizeGoogleClassroom(raw: RawGClassCourse): Promise<No
     if (studentCount !== undefined) metaAdd.students = studentCount
     if (enrollmentCode !== undefined) metaAdd.enrollmentCode = enrollmentCode
     if (Object.keys(metaAdd).length) course.metadata = Object.assign({}, course.metadata, metaAdd)
-  } catch (e) {}
+  } catch (e) { }
 
   // Format instructors to match edX/Canvas structure
   let instructors: any[] = []
-  
+
   // Try to extract instructor info from different possible sources
   if (raw?.owners && Array.isArray(raw.owners)) {
     instructors = raw.owners.map((t: any) => ({
@@ -52,7 +49,7 @@ export async function normalizeGoogleClassroom(raw: RawGClassCourse): Promise<No
   } else if (raw?.teachers && Array.isArray(raw.teachers)) {
     instructors = raw.teachers.map((t: any) => ({
       instructor_id: t.id?.toString(),
-      instructor_name: t.name?.fullName || t.displayName || undefined, 
+      instructor_name: t.name?.fullName || t.displayName || undefined,
       instructor_email: t.emailAddress || undefined,
       instructor_username: t.emailAddress || undefined
     }))
@@ -68,7 +65,7 @@ export async function normalizeGoogleClassroom(raw: RawGClassCourse): Promise<No
   // Extract basic learner info (will be enhanced with assignments later)
   const learners = (raw?.students || raw?.members || []).map((s: any) => {
     const id = s.userId?.toString() || s.id?.toString()
-    
+
     // Handle different student data formats
     let email, username, name
     if (s.profile) {
@@ -78,14 +75,14 @@ export async function normalizeGoogleClassroom(raw: RawGClassCourse): Promise<No
       name = s.profile.name?.fullName || s.profile.name
     } else {
       // Processed format from proxy (current case)
-      email = s.emailAddress || undefined  
+      email = s.emailAddress || undefined
       username = s.emailAddress || s.email || undefined
       name = s.name || s.displayName || undefined
     }
-    
+
     // Google Classroom doesn't provide enrollment time directly, use course creation time as fallback
     const time_enrolled = ensureIso(raw?.course?.creationTime || raw?.course?.updateTime) || undefined
-    
+
     return { id, email, username, name, time_enrolled }
   })
 
@@ -99,13 +96,13 @@ export async function normalizeGoogleClassroom(raw: RawGClassCourse): Promise<No
   // Build learner assignments from courseWork submissions
   const learnersMap: Record<string, any> = {}
   learners.forEach((l: any) => {
-    learnersMap[l.id] = { 
-      id: l.id, 
-      email: l.email, 
+    learnersMap[l.id] = {
+      id: l.id,
+      email: l.email,
       username: l.username,
-      name: l.name, 
+      name: l.name,
       time_enrolled: l.time_enrolled,
-      assignments: [] 
+      assignments: []
     }
   })
 
@@ -127,10 +124,10 @@ export async function normalizeGoogleClassroom(raw: RawGClassCourse): Promise<No
         const submissionObj: any = {
           submitted_at: ensureIso(s.updateTime) || ensureIso(s.creationTime),
           workflow_state: s.state || 'unknown',
-          grades: [] as any[],
+          grades: [] as Grade[],
         }
 
-  submissionObj.grades.push({ score: score, totalscore: totalscore, percentage: percentage != null ? parseFloat(Number(percentage).toFixed(2)) : null })
+        submissionObj.grades.push({ score: score, totalscore: totalscore, percentage: percentage != null ? parseFloat(Number(percentage).toFixed(2)) : null })
 
         // Question-level details if present in submission (multipleChoiceSubmission / shortAnswerSubmission)
         const questions: any[] = []
@@ -154,25 +151,25 @@ export async function normalizeGoogleClassroom(raw: RawGClassCourse): Promise<No
         const isQuiz = !!(questions.length)
         const assignmentObj: any = {
           id: cwId,
-          type: workType || 'courseWork', 
+          type: workType || 'courseWork',
           title: cw.title,
           maxScore: maxPoints,
           is_quiz_assignment: isQuiz,
           submissions: [submissionObj]
         }
-        
+
         // Add subsection_name to match edX/Canvas structure
         if (cw.topicId) {
           assignmentObj.subsection_name = `Topic ${cw.topicId}`
         } else {
           assignmentObj.subsection_name = 'General'
         }
-        
-        // Add total_questions for quizzes to match edX/Canvas structure  
+
+        // Add total_questions for quizzes to match edX/Canvas structure
         if (isQuiz && questions.length > 0) {
           assignmentObj.total_questions = questions.length
         }
-        
+
         if (isQuiz && ((cw && cw.quizId) || cwId)) assignmentObj.quiz_id = (cw && cw.quizId) || cwId
         learnersMap[learnerId].assignments.push(assignmentObj)
       }
@@ -182,22 +179,21 @@ export async function normalizeGoogleClassroom(raw: RawGClassCourse): Promise<No
   // Format chat/discussions to match edX/Canvas structure
   const chat: any[] = []
   if (raw?.announcements && raw.announcements.length > 0) {
-    chat.push({ 
-      channel: 'announcements', 
-      messages: raw.announcements.map((a: any) => ({ 
-        id: a.id?.toString(), 
-        from: a.creator?.id?.toString(), 
-        text: a.text, 
-        ts: ensureIso(a.updateTime) 
-      })) 
+    chat.push({
+      channel: 'announcements',
+      messages: raw.announcements.map((a: any) => ({
+        id: a.id?.toString(),
+        from: a.creator?.id?.toString(),
+        text: a.text,
+        ts: ensureIso(a.updateTime)
+      }))
     })
   } else {
     // Add empty discussion channel to match Canvas/edX structure
     chat.push({ channel: 'discussion', messages: [] })
   }
 
-  const diagnostics = { missingEmailCount: learners.filter((l: any) => !l.email).length, notes: [] as string[] }
-  if (diagnostics.missingEmailCount > 0) diagnostics.notes!.push('Some learners missing email')
+  const diagnostics = createDiagnostics(learners)
 
   // Convert learnersMap back to array, merging assignments into learners
   const learnersOut = Object.values(learnersMap).map((l: any) => {
@@ -213,13 +209,13 @@ export async function normalizeGoogleClassroom(raw: RawGClassCourse): Promise<No
         email = email || found.profile?.emailAddress || found.emailAddress
       }
     }
-    return { 
-      id: l.id, 
-      email, 
-      username, 
-      name, 
+    return {
+      id: l.id,
+      email,
+      username,
+      name,
       time_enrolled: l.time_enrolled,
-      assignments: l.assignments 
+      assignments: l.assignments
     }
   })
 

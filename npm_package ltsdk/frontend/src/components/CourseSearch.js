@@ -16,7 +16,7 @@ const CourseSearch = ({ selectedCourseId, onCourseSelect, onCourseIdChange }) =>
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
-        searchRef.current && 
+        searchRef.current &&
         !searchRef.current.contains(event.target) &&
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target)
@@ -70,7 +70,7 @@ const CourseSearch = ({ selectedCourseId, onCourseSelect, onCourseIdChange }) =>
           placeholder="Search courses by name or ID (e.g., CS101, Introduction to Computer Science)"
           className="course-search-input"
         />
-  {loading && <div className="search-loading" aria-hidden="true"><Icon name="search" size={16} /></div>}
+        {loading && <div className="search-loading" aria-hidden="true"><Icon name="search" size={16} /></div>}
       </div>
 
       {showDropdown && (
@@ -84,8 +84,8 @@ const CourseSearch = ({ selectedCourseId, onCourseSelect, onCourseIdChange }) =>
             <div className="search-no-results">
               <div className="no-results-icon" aria-hidden="true"><Icon name="search" size={16} /></div>
               <div className="no-results-text">
-                {searchQuery.length < 2 
-                  ? 'Type at least 2 characters to search' 
+                {searchQuery.length < 2
+                  ? 'Type at least 2 characters to search'
                   : 'No courses found matching your search'
                 }
               </div>
@@ -106,8 +106,8 @@ const CourseSearch = ({ selectedCourseId, onCourseSelect, onCourseIdChange }) =>
                   </div>
                   {course.short_description && (
                     <div className="course-description">
-                      {course.short_description.length > 100 
-                        ? `${course.short_description.substring(0, 100)}...` 
+                      {course.short_description.length > 100
+                        ? `${course.short_description.substring(0, 100)}...`
                         : course.short_description
                       }
                     </div>

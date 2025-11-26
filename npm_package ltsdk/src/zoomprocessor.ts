@@ -204,7 +204,7 @@ async function getPastMeetingPolls(
 function processParticipantsAndPollsData(
   participants: ZoomParticipant[],
   pollScores: Map<string, ParticipantData>,
-): Map<string, ParticipantData> { 
+): Map<string, ParticipantData> {
   const participantMap = new Map<string, ParticipantData>();
   participants.forEach(participant => {
     const name = participant.name;

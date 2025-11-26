@@ -13,10 +13,10 @@
   },
   "instructors": [
     {
-      "id": "t1",
-      "email": "teacher@gclass.edu",
-      "username": "teacher@gclass.edu",
-      "name": "Prof GC"
+      "instructor_id": "t1",
+      "instructor_email": "teacher@gclass.edu",
+      "instructor_username": "teacher@gclass.edu",
+      "instructor_name": "Prof GC"
     }
   ],
   "learners": [
@@ -32,6 +32,7 @@
           "title": "Quiz 1",
           "maxScore": 10,
           "is_quiz_assignment": false,
+          "subsection_name": "General",
           "submissions": [
             {
               "submitted_at": "2025-02-01T10:00:00.000Z",
@@ -63,7 +64,10 @@
     }
   ],
   "diagnostics": {
-    "missingEmailCount": 0,
-    "notes": []
-  }
+    "missingEmailCount": 1,
+    "notes": [
+      "Some learners missing email"
+    ]
+  },
+  "transcript": []
 }

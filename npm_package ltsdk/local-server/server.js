@@ -67,20 +67,71 @@ async function proxyFetch(remoteBase, lms, courseId) {
 const server = http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
   // CORS: allow frontend dev origin or any origin via env override
-  const ALLOW_ORIGIN = process.env.LTSDK_ALLOW_ORIGIN || '*';
-  res.setHeader('Access-Control-Allow-Origin', ALLOW_ORIGIN);
+  // When credentials are enabled, we must NOT return '*'. Echo the request
+  // Origin header (dev-only) so the browser accepts credentialed responses.
+  const envAllowOrigin = process.env.LTSDK_ALLOW_ORIGIN || '*';
+  const reqOrigin = req.headers && req.headers.origin;
+  let allowOrigin = envAllowOrigin;
+  // Allow credentialed requests when explicitly enabled or when the
+  // incoming request contains cookies (dev-friendly behavior).
+  const allowCredentials = (process.env.LTSDK_ALLOW_CREDENTIALS === 'true') || !!(req.headers && req.headers.cookie);
+  if (allowCredentials) {
+    // Prefer echoing the incoming Origin when credentials are allowed.
+    // Browsers reject '*' when credentials are included, so echo the origin.
+    allowOrigin = reqOrigin || envAllowOrigin;
+  }
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-  // If you want credentials (cookies) enabled, set LTSDK_ALLOW_CREDENTIALS=true
-  if (process.env.LTSDK_ALLOW_CREDENTIALS === 'true') {
+  if (allowCredentials) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }
-
-  // Handle preflight
-  if (req.method === 'OPTIONS') {
+  // Handle simple OPTIONS preflight responses centrally
+  if (String(req.method || '').toUpperCase() === 'OPTIONS') {
+    // Minimal response for preflight - headers are already written
     res.writeHead(204);
-    return res.end();
+    res.end();
+    return;
   }
+  // Simple runtime config endpoints for dev: GET/POST /api/config
+  if (parsed.pathname === '/api/config' || parsed.pathname === '/api/config/') {
+    if (String(req.method || '').toUpperCase() === 'GET') {
+      const lms = parsed.query && parsed.query.lms;
+      try {
+        const cfgPath = path.join(__dirname, 'configs.json');
+        if (!fs.existsSync(cfgPath)) return sendJson(res, { configs: {} });
+        const raw = fs.readFileSync(cfgPath, 'utf8');
+        const all = raw ? JSON.parse(raw) : {};
+        if (lms) return sendJson(res, { lms: lms, config: all[lms] || null });
+        return sendJson(res, { configs: all });
+      } catch (e) {
+        return sendJson(res, { error: 'could not read configs', details: String(e) }, 500);
+      }
+    }
+    if (String(req.method || '').toUpperCase() === 'POST') {
+      // collect body
+      let body = '';
+      req.on('data', (chunk) => body += chunk.toString());
+      req.on('end', () => {
+        try {
+          const obj = body ? JSON.parse(body) : null;
+          if (!obj || !obj.lms || !obj.credentials) return sendJson(res, { error: 'invalid payload, require { lms, credentials }' }, 400);
+          const cfgPath = path.join(__dirname, 'configs.json');
+          let all = {};
+          try { if (fs.existsSync(cfgPath)) all = JSON.parse(fs.readFileSync(cfgPath, 'utf8') || '{}') } catch (e) { all = {} }
+          all[obj.lms] = obj.credentials;
+          fs.writeFileSync(cfgPath, JSON.stringify(all, null, 2), { encoding: 'utf8' });
+          return sendJson(res, { ok: true, lms: obj.lms, saved: all[obj.lms] });
+        } catch (e) { return sendJson(res, { error: 'invalid json', details: String(e) }, 400); }
+      });
+      return;
+    }
+    return sendJson(res, { error: 'method not allowed' }, 405);
+  }
+  // NOTE: dev-only internal endpoints removed for cleanup. Use explicit
+  // debugging (LTSDK_DEBUG / LTSDK_DEBUG_VERBOSE) and the auth server
+  // token endpoint for runtime credential inspection instead of exposing
+  // internal HTTP endpoints here.
   const parts = parsed.pathname.split('/').filter(Boolean);
 
   // Only basic route
@@ -174,13 +225,53 @@ const server = http.createServer(async (req, res) => {
       if (!connectorFn || !adapterFn) return null;
 
       try {
+        // Attempt to fetch runtime creds so connectors can use authenticated calls
+        async function fetchRuntimeCredsForFetch() {
+          try {
+            const authPort = process.env.LTSDK_AUTH_PORT || 5002;
+            const client = require('http');
+            const pathStr = `/auth/lms/${encodeURIComponent(lmsName)}/token`;
+            const opts = { hostname: 'localhost', port: authPort, path: pathStr, method: 'GET', headers: {} };
+            if (req.headers && req.headers.cookie) opts.headers.Cookie = req.headers.cookie;
+            return await new Promise((resolve) => {
+              const r = client.request(opts, (resp) => {
+                let data = '';
+                resp.setEncoding('utf8');
+                resp.on('data', (c) => data += c);
+                resp.on('end', () => {
+                  try { resolve(JSON.parse(data)); } catch (e) { resolve(null); }
+                });
+              });
+              r.on('error', () => resolve(null));
+              r.end();
+            });
+          } catch (e) { return null; }
+        }
+
+        const runtimeResp = await fetchRuntimeCredsForFetch();
+        const runtimeCreds = (function (r) {
+          if (!r) return null;
+          const baseUrl = (r.credentials && r.credentials.baseUrl) || r.baseUrl || undefined;
+          const accessToken = (r.token && (r.token.access_token || r.token.accessToken)) || r.accessToken || r.access_token || undefined;
+          const out = {};
+          if (baseUrl) out.baseUrl = baseUrl;
+          if (accessToken) out.accessToken = accessToken;
+          return Object.keys(out).length ? out : null;
+        })(runtimeResp);
+
         // call connector then adapter
         if (process.env.LTSDK_DEBUG === 'true') {
           console.log('[LTSDK] invoking connector function:', connectorFn.name || '<anonymous>')
         }
-        const raw = await Promise.resolve(connectorFn(courseId));
+        const raw = await Promise.resolve(connectorFn(courseId, runtimeCreds));
         if (process.env.LTSDK_DEBUG === 'true') {
-          console.log('[LTSDK] connector returned raw data keys:', raw && typeof raw === 'object' ? Object.keys(raw).slice(0,20) : typeof raw)
+          console.log('[LTSDK] connector returned raw data keys:', raw && typeof raw === 'object' ? Object.keys(raw).slice(0, 20) : typeof raw)
+          try {
+            // Print a concise preview (first 1KB) of the raw payload to help
+            // triage missing fields and permission issues without flooding logs.
+            const preview = (typeof raw === 'object') ? JSON.stringify(raw, Object.keys(raw).slice(0, 20), 2).slice(0, 1024) : String(raw)
+            console.log('[LTSDK] raw preview (first 1KB):', preview)
+          } catch (pe) { /* ignore preview errors */ }
         }
         const normalized = await Promise.resolve(adapterFn(raw));
         return normalized;
@@ -197,13 +288,18 @@ const server = http.createServer(async (req, res) => {
     try {
       const live = await tryLiveFetch(lms, courseId);
       if (live) {
-        // When debugging, print the complete normalized payload to the server terminal
+        // When debugging, print a concise notice. Full JSON dumps are gated
+        // behind LTSDK_DEBUG_VERBOSE to avoid flooding terminals.
         if (process.env.LTSDK_DEBUG === 'true') {
           try {
-            console.log('LTSDK live normalized payload for', `${lms}/${courseId}:`, JSON.stringify(live, null, 2))
+            if (process.env.LTSDK_DEBUG_VERBOSE === 'true') {
+              console.log('LTSDK live normalized payload for', `${lms}/${courseId}:`, JSON.stringify(live, null, 2));
+            }
+            else {
+              console.log('LTSDK live normalized payload available for', `${lms}/${courseId}`, '(set LTSDK_DEBUG_VERBOSE=true to print full payload)');
+            }
           } catch (e) {
-            // fallback to a simple log if payload isn't serializable for any reason
-            console.log('LTSDK live normalized payload (non-serializable) for', `${lms}/${courseId}`)
+            console.log('LTSDK live normalized payload (non-serializable) for', `${lms}/${courseId}`);
           }
         }
         cache.set(cacheKey, { ts: nowSec(), payload: live });
@@ -234,51 +330,98 @@ const server = http.createServer(async (req, res) => {
     const fresh = parsed.query && (parsed.query.fresh === 'true' || parsed.query.fresh === '1');
 
     // Listing/search is not supported without fixtures. To discover courses,
-      // Try to call a connector-provided list/search function (connector-first).
-      async function tryLiveSearch(lmsName, query) {
-        const moduleMap = {
-          'canvas': 'canvas',
-          'edx': 'edx',
-          'moodle': 'moodle',
-          'google-classroom': 'googleClassroom',
-          'googleclassroom': 'googleClassroom'
-        };
-        const mod = moduleMap[lmsName] || lmsName;
-        const distConnectorPath = path.join(__dirname, '..', 'dist', 'src', 'connectors', `${mod}.js`);
+    // Try to call a connector-provided list/search function (connector-first).
+    async function tryLiveSearch(lmsName, query) {
+      const moduleMap = {
+        'canvas': 'canvas',
+        'edx': 'edx',
+        'moodle': 'moodle',
+        'google-classroom': 'googleClassroom',
+        'googleclassroom': 'googleClassroom'
+      };
+      const mod = moduleMap[lmsName] || lmsName;
+      const distConnectorPath = path.join(__dirname, '..', 'dist', 'src', 'connectors', `${mod}.js`);
 
-        let connector = null;
-        // reuse cached connector if available to avoid repeated filesystem requires
-        try {
-          if (connectorCache.has(mod)) {
-            const cached = connectorCache.get(mod);
-            connector = cached.connector || null;
-          }
-        } catch (e) { /* ignore */ }
+      let connector = null;
+      // reuse cached connector if available to avoid repeated filesystem requires
+      try {
+        if (connectorCache.has(mod)) {
+          const cached = connectorCache.get(mod);
+          connector = cached.connector || null;
+        }
+      } catch (e) { /* ignore */ }
+      if (!connector) {
+        try { if (fs.existsSync(distConnectorPath)) connector = require(distConnectorPath) } catch (e) { connector = null }
         if (!connector) {
-          try { if (fs.existsSync(distConnectorPath)) connector = require(distConnectorPath) } catch (e) { connector = null }
-          if (!connector) {
-            try { connector = require(path.join(__dirname, '..', 'src', 'connectors', `${mod}.js`)) } catch (e) { connector = null }
-          }
-          try { connectorCache.set(mod, { connector }); } catch (e) { /* ignore */ }
+          try { connector = require(path.join(__dirname, '..', 'src', 'connectors', `${mod}.js`)) } catch (e) { connector = null }
         }
-        if (!connector) return null;
-
-        function pascal(s) { return s.replace(/(^|[-_])(\w)/g, (_, __, ch) => ch.toUpperCase()) }
-        const pascalName = pascal(mod);
-        const candidates = [`list${pascalName}Courses`, `list${pascalName}`, 'listCourses', 'searchCourses', 'list'];
-        for (const name of candidates) {
-            try {
-            const fn = connector[name] || connector[name.charAt(0).toLowerCase() + name.slice(1)] || (connector.default && connector.default[name]);
-            if (typeof fn === 'function') {
-              const results = await Promise.resolve(fn(query));
-              return results;
-            }
-          } catch (e) {
-            // ignore and try next
-          }
-        }
-        return null;
+        try { connectorCache.set(mod, { connector }); } catch (e) { /* ignore */ }
       }
+      if (!connector) return null;
+
+      function pascal(s) { return s.replace(/(^|[-_])(\w)/g, (_, __, ch) => ch.toUpperCase()) }
+      const pascalName = pascal(mod);
+      const candidates = [`list${pascalName}Courses`, `list${pascalName}`, 'listCourses', 'searchCourses', 'list'];
+
+      // Fetch runtime creds from auth server (if session hints present)
+      async function fetchCredsFromAuth() {
+        try {
+          const authPort = process.env.LTSDK_AUTH_PORT || 5002;
+          const client = require('http');
+          // Use the token endpoint to obtain the runtime token object
+          const pathStr = `/auth/lms/${encodeURIComponent(lmsName)}/token`;
+          const opts = { hostname: 'localhost', port: authPort, path: pathStr, method: 'GET', headers: {} };
+          if (req.headers && req.headers.cookie) opts.headers.Cookie = req.headers.cookie;
+          return await new Promise((resolve) => {
+            const r = client.request(opts, (resp) => {
+              let data = '';
+              resp.setEncoding('utf8');
+              resp.on('data', (c) => data += c);
+              resp.on('end', () => {
+                try { resolve(JSON.parse(data)); } catch (e) { resolve(null); }
+              });
+            });
+            r.on('error', () => resolve(null));
+            r.end();
+          });
+        } catch (e) { return null; }
+      }
+
+      let runtimeCredsResp = null;
+      try { runtimeCredsResp = await fetchCredsFromAuth(); } catch (e) { runtimeCredsResp = null }
+      const normalizedCreds = (function (r) {
+        if (!r) return null;
+        const baseUrl = (r.credentials && r.credentials.baseUrl) || r.baseUrl || undefined;
+        const accessToken = (r.token && (r.token.access_token || r.token.accessToken)) || r.accessToken || r.access_token || undefined;
+        const out = {};
+        if (baseUrl) out.baseUrl = baseUrl;
+        if (accessToken) out.accessToken = accessToken;
+        return Object.keys(out).length ? out : null;
+      })(runtimeCredsResp);
+
+      if (process.env.LTSDK_DEBUG === 'true') {
+        try {
+          console.log('[LTSDK] tryLiveSearch normalizedCreds for', lmsName, ':', JSON.stringify(normalizedCreds));
+        } catch (e) { console.log('[LTSDK] tryLiveSearch normalizedCreds (non-serializable)') }
+      }
+
+      for (const name of candidates) {
+        try {
+          const fn = connector[name] || connector[name.charAt(0).toLowerCase() + name.slice(1)] || (connector.default && connector.default[name]);
+          if (typeof fn === 'function') {
+            // call and log first successful endpoint body when debugging
+            const results = await Promise.resolve(fn(query, 25, normalizedCreds));
+            if (process.env.LTSDK_DEBUG === 'true') {
+              try { console.log('[LTSDK] tryLiveSearch connector result count:', Array.isArray(results) ? results.length : (results ? 1 : 0)); } catch (e) { }
+            }
+            return results;
+          }
+        } catch (e) {
+          // ignore and try next
+        }
+      }
+      return null;
+    }
 
     try {
       const results = await tryLiveSearch(lms, q);
@@ -287,21 +430,48 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, { source: 'live-index', results: out });
       }
     } catch (e) {
-        // ignore and fall through to proxy
-      }
+      // ignore and fall through to proxy
+    }
 
-      // Optionally proxy to remote SDK server if configured
-      if (REMOTE_SDK) {
-        try {
-          const text = await proxyFetch(REMOTE_SDK, lms, `?search=${encodeURIComponent(q)}`);
-          const payload = JSON.parse(text);
-          return sendJson(res, { source: 'remote', results: payload.results || [] });
-        } catch (err) {
-          return sendJson(res, { error: 'Remote fetch failed', details: String(err) }, 502);
+    // Optionally proxy to remote SDK server if configured
+    if (REMOTE_SDK) {
+      try {
+        const text = await proxyFetch(REMOTE_SDK, lms, `?search=${encodeURIComponent(q)}`);
+        const payload = JSON.parse(text);
+        return sendJson(res, { source: 'remote', results: payload.results || [] });
+      } catch (err) {
+        return sendJson(res, { error: 'Remote fetch failed', details: String(err) }, 502);
+      }
+    }
+
+    return sendJson(res, { error: 'Index not supported', message: 'No live search available for this LMS' }, 501);
+  }
+
+  // Logging endpoint for Learning Tokens backend data
+  if (parsed.pathname === '/api/log' && String(req.method || '').toUpperCase() === 'POST') {
+    let body = '';
+    req.on('data', (chunk) => body += chunk.toString());
+    req.on('end', () => {
+      try {
+        const data = body ? JSON.parse(body) : null;
+        if (data && data.course) {
+          console.log('\n' + '='.repeat(80));
+          console.log('📤 Normalized Course Data Being Sent to Learning Tokens Backend');
+          console.log('='.repeat(80));
+          console.log('Course ID:', data.course.id || 'N/A');
+          console.log('Course Name:', data.course.name || 'N/A');
+          console.log('Instructors:', data.instructors ? data.instructors.length : 0);
+          console.log('Learners:', data.learners ? data.learners.length : 0);
+          console.log('\nFull Normalized JSON:');
+          console.log(JSON.stringify(data, null, 2));
+          console.log('='.repeat(80) + '\n');
         }
+        return sendJson(res, { ok: true, logged: true });
+      } catch (e) {
+        return sendJson(res, { error: 'Invalid JSON', details: String(e) }, 400);
       }
-
-      return sendJson(res, { error: 'Index not supported', message: 'No live search available for this LMS' }, 501);
+    });
+    return;
   }
 
   // Health and index

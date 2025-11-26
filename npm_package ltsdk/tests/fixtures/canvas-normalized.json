@@ -17,9 +17,10 @@
   },
   "instructors": [
     {
-      "id": "101",
-      "email": "prof@example.edu",
-      "name": "Prof. Ada"
+      "instructor_id": "101",
+      "instructor_email": "prof@example.edu",
+      "instructor_name": "Prof. Ada",
+      "instructor_username": "prof@example.edu"
     }
   ],
   "learners": [
@@ -34,15 +35,15 @@
           "title": "Homework 1",
           "maxScore": 100,
           "is_quiz_assignment": false,
-          "quiz_id": null,
           "submissions": [
             {
               "submitted_at": "2025-02-01T12:00:00.000Z",
+              "workflow_state": "submitted",
               "grades": [
                 {
                   "score": 92,
                   "totalscore": 100,
-                  "percentage": null
+                  "percentage": 92
                 }
               ]
             }

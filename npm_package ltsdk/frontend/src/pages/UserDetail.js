@@ -135,8 +135,8 @@ const UserDetail = () => {
               <div className="progress-section">
                 <div className="progress-label">Overall Progress</div>
                 <div className="progress-bar">
-                  <div 
-                    className="progress-fill" 
+                  <div
+                    className="progress-fill"
                     style={{ width: `${(gradebook.percent || 0) * 100}%` }}
                   ></div>
                 </div>

@@ -7,7 +7,7 @@
 const SDK_BASE = process.env.REACT_APP_SDK_BASE_URL || 'http://localhost:5001'
 
 async function fetchJson(url) {
-  const res = await fetch(url)
+  const res = await fetch(url, { credentials: 'include', headers: { 'Accept': 'application/json' } })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     const err = new Error(`Request failed ${res.status} ${res.statusText}: ${text}`)

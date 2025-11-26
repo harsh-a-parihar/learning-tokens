@@ -36,13 +36,33 @@ function normalizeUser(u: any) {
 
 // Fetch detailed course data (best-effort). Keep this lightweight so it
 // succeeds across diverse edX deployments — callers will normalize further.
-export async function fetchEdxCourse(courseId: string) {
+export async function fetchEdxCourseWithClient(courseId: string, clientToUse: any) {
   if (!courseId) throw new Error('courseId required')
 
-  const courseRes = await client.get(`/api/courses/v1/courses/${encodeURIComponent(courseId)}`).catch(() => ({ data: null }))
+  let courseRes
+  try {
+    courseRes = await clientToUse.get(`/api/courses/v1/courses/${encodeURIComponent(courseId)}`)
+  } catch (e: any) {
+    if (e && e.response && (e.response.status === 401 || e.response.status === 403)) {
+      const err: any = new Error('edX API authentication error')
+      err.status = e.response.status
+      throw err
+    }
+    courseRes = { data: null }
+  }
   const course = courseRes.data || { id: courseId }
 
-  const gradebookRes = await client.get(`/api/grades/v1/gradebook/${encodeURIComponent(courseId)}/`).catch(() => ({ data: null }))
+  let gradebookRes
+  try {
+    gradebookRes = await clientToUse.get(`/api/grades/v1/gradebook/${encodeURIComponent(courseId)}/`)
+  } catch (e: any) {
+    if (e && e.response && (e.response.status === 401 || e.response.status === 403)) {
+      const err: any = new Error('edX API authentication error')
+      err.status = e.response.status
+      throw err
+    }
+    gradebookRes = { data: null }
+  }
   const gradebook = gradebookRes.data || null
 
   // Simplified flow: fetch course_home metadata (preferred), fall back to
@@ -52,9 +72,9 @@ export async function fetchEdxCourse(courseId: string) {
   let courseMetadata: any = null
 
   try {
-    const instRes = await client.get(`/api/course_home/v1/course_metadata/${encodeURIComponent(courseId)}/`).catch(() => ({ data: null }))
+    const instRes = await clientToUse.get(`/api/course_home/v1/course_metadata/${encodeURIComponent(courseId)}/`).catch(() => ({ data: null }))
     courseMetadata = instRes.data || null
-    if (process.env.LTSDK_DEBUG) console.debug('[edx connector] course_metadata:', JSON.stringify(courseMetadata))
+    if (process.env.LTSDK_DEBUG === 'true') console.debug('[edx connector] course_metadata:', JSON.stringify(courseMetadata))
     const metaInstructors = (courseMetadata && courseMetadata.instructors) || []
     instructors = Array.isArray(metaInstructors) ? metaInstructors.map((m: any) => normalizeUser(m)).filter(Boolean) : []
   } catch (e) {
@@ -68,11 +88,21 @@ export async function fetchEdxCourse(courseId: string) {
     if (norm) {
       instructors = [norm]
       membershipRaw = { __course_username_fallback: candUsername }
-      if (process.env.LTSDK_DEBUG) console.debug('[edx connector] instructors from course metadata username fallback:', JSON.stringify(instructors))
+      if (process.env.LTSDK_DEBUG === 'true') console.debug('[edx connector] instructors from course metadata username fallback:', JSON.stringify(instructors))
     }
   }
 
-  const enrollRes = await client.get(`/api/enrollment/v1/enrollments/?course_id=${encodeURIComponent(courseId)}`).catch(() => ({ data: null }))
+  let enrollRes
+  try {
+    enrollRes = await clientToUse.get(`/api/enrollment/v1/enrollments/?course_id=${encodeURIComponent(courseId)}`)
+  } catch (e: any) {
+    if (e && e.response && (e.response.status === 401 || e.response.status === 403)) {
+      const err: any = new Error('edX API authentication error')
+      err.status = e.response.status
+      throw err
+    }
+    enrollRes = { data: null }
+  }
   let students = (enrollRes.data && enrollRes.data.results) || []
 
   // Try to enrich student data with more detailed information including email and enrollment dates
@@ -81,20 +111,20 @@ export async function fetchEdxCourse(courseId: string) {
     const enrichedStudents = []
     for (const student of students) {
       let enrichedStudent = { ...student }
-      
+
       // Try to get user profile information if we have a user reference
       if (student.user || student.username || student.user_id) {
         try {
           const userId = student.user?.id || student.user_id || student.username
           if (userId) {
             // Try multiple endpoints for user details
-            if (process.env.LTSDK_DEBUG) console.debug(`[edx connector] Attempting to enrich enrollment student ${userId}`)
-            const userRes = await client.get(`/api/user/v1/accounts/${encodeURIComponent(userId)}`).catch(() => 
-              client.get(`/api/users/v1/accounts/${encodeURIComponent(userId)}`).catch(() => 
-                client.get(`/api/user/v1/preferences/${encodeURIComponent(userId)}`).catch(() => ({ data: null }))
+            if (process.env.LTSDK_DEBUG === 'true') console.debug(`[edx connector] Attempting to enrich enrollment student ${userId}`)
+            const userRes = await clientToUse.get(`/api/user/v1/accounts/${encodeURIComponent(userId)}`).catch(() =>
+              clientToUse.get(`/api/users/v1/accounts/${encodeURIComponent(userId)}`).catch(() =>
+                clientToUse.get(`/api/user/v1/preferences/${encodeURIComponent(userId)}`).catch(() => ({ data: null }))
               )
             )
-            
+
             if (userRes.data) {
               // Merge user profile data
               enrichedStudent = {
@@ -106,41 +136,40 @@ export async function fetchEdxCourse(courseId: string) {
                   name: userRes.data.name || userRes.data.full_name || enrichedStudent.user?.name,
                 }
               }
-              if (process.env.LTSDK_DEBUG) {
+              if (process.env.LTSDK_DEBUG === 'true') {
                 console.debug(`[edx connector] Enriched enrollment student ${userId} email: "${userRes.data.email}"`)
               }
             } else {
-              if (process.env.LTSDK_DEBUG) {
+              if (process.env.LTSDK_DEBUG === 'true') {
                 console.debug(`[edx connector] No user profile data found for enrollment student ${userId}`)
               }
             }
           }
         } catch (e) {
           // Continue with original student data if enrichment fails
-          if (process.env.LTSDK_DEBUG) console.debug('[edx connector] Failed to enrich student data:', e instanceof Error ? e.message : String(e))
+          if (process.env.LTSDK_DEBUG === 'true') console.debug('[edx connector] Failed to enrich student data:', e instanceof Error ? e.message : String(e))
         }
       }
-      
+
       // Ensure we have enrollment timestamp - try multiple possible field names
       if (!enrichedStudent.created && !enrichedStudent.enrolled_at && !enrichedStudent.enrollment_date) {
         enrichedStudent.enrolled_at = enrichedStudent.date_joined || enrichedStudent.enrollment_date || enrichedStudent.created
       }
-      
+
       enrichedStudents.push(enrichedStudent)
     }
     students = enrichedStudents
   } catch (e) {
     // If enrichment fails completely, continue with original student data
-    if (process.env.LTSDK_DEBUG) console.debug('[edx connector] Failed to enrich students:', e instanceof Error ? e.message : String(e))
+    if (process.env.LTSDK_DEBUG === 'true') console.debug('[edx connector] Failed to enrich students:', e instanceof Error ? e.message : String(e))
   }
 
   // Always try to enrich students from gradebook if we have gradebook data but few/no students
   if (gradebook) {
-    // Handle different gradebook structures: direct array, .results array, or individual entries
-    if (process.env.LTSDK_DEBUG) console.debug('[edx connector] Extracting/enriching students from gradebook data')
-    
+    if (process.env.LTSDK_DEBUG === 'true') console.debug('[edx connector] Extracting/enriching students from gradebook data')
+
     try {
-      // Handle different gradebook structures
+      // Handle different gradebook structures: direct array, .results array, or individual entries
       let gradebookArray = []
       if (Array.isArray(gradebook)) {
         gradebookArray = gradebook
@@ -148,28 +177,28 @@ export async function fetchEdxCourse(courseId: string) {
         gradebookArray = gradebook.results
       } else if (typeof gradebook === 'object') {
         // Handle case where gradebook might be a single object or have other structure
-        gradebookArray = Object.values(gradebook).filter((item: any) => 
+        gradebookArray = Object.values(gradebook).filter((item: any) =>
           item && typeof item === 'object' && (item.username || item.user || item.user_id)
         )
       }
       const extractedStudents = []
       const seenUsernames = new Set()
-      
-      if (process.env.LTSDK_DEBUG) {
+
+      if (process.env.LTSDK_DEBUG === 'true') {
         console.debug('[edx connector] Processing gradebook array with', gradebookArray.length, 'entries')
         if (gradebookArray.length > 0) {
           console.debug('[edx connector] First gradebook entry keys:', Object.keys(gradebookArray[0]))
           console.debug('[edx connector] First gradebook entry sample:', JSON.stringify(gradebookArray[0], null, 2))
         }
       }
-      
+
       for (const gradebookEntry of gradebookArray) {
         const username = gradebookEntry.username || gradebookEntry.user || gradebookEntry.user_id
         const userId = gradebookEntry.user_id || gradebookEntry.id || username
-        
+
         if (username && !seenUsernames.has(username)) {
           seenUsernames.add(username)
-          
+
           let studentData = {
             user_id: userId,
             username: username,
@@ -183,10 +212,10 @@ export async function fetchEdxCourse(courseId: string) {
               name: gradebookEntry.name || gradebookEntry.full_name
             }
           }
-          
+
           // Try to enrich with user profile API if we don't have email or email is empty
           if ((!studentData.email || studentData.email.trim() === '') && userId) {
-            if (process.env.LTSDK_DEBUG) console.debug(`[edx connector] Attempting to fetch email for user ${username} (ID: ${userId})`)
+            if (process.env.LTSDK_DEBUG === 'true') console.debug(`[edx connector] Attempting to fetch email for user ${username} (ID: ${userId})`)
             try {
               // Try multiple user API endpoints to get email information
               const userEndpoints = [
@@ -195,20 +224,20 @@ export async function fetchEdxCourse(courseId: string) {
                 `/api/user/v1/accounts/${encodeURIComponent(username)}`,
                 `/api/users/v1/accounts/${encodeURIComponent(username)}`
               ]
-              
+
               let userRes = null
               for (const endpoint of userEndpoints) {
                 try {
-                  userRes = await client.get(endpoint)
+                  userRes = await clientToUse.get(endpoint)
                   if (userRes?.data) {
-                    if (process.env.LTSDK_DEBUG) console.debug(`[edx connector] Successfully fetched user data from ${endpoint}:`, JSON.stringify(userRes.data, null, 2))
+                    if (process.env.LTSDK_DEBUG === 'true') console.debug(`[edx connector] Successfully fetched user data from ${endpoint}:`, JSON.stringify(userRes.data, null, 2))
                     break
                   }
                 } catch (e) {
-                  if (process.env.LTSDK_DEBUG) console.debug(`[edx connector] Failed to fetch from ${endpoint}:`, e instanceof Error ? e.message : String(e))
+                  if (process.env.LTSDK_DEBUG === 'true') console.debug(`[edx connector] Failed to fetch from ${endpoint}:`, e instanceof Error ? e.message : String(e))
                 }
               }
-              
+
               if (userRes?.data) {
                 const originalEmail = studentData.email
                 studentData.email = userRes.data.email || studentData.email
@@ -216,42 +245,37 @@ export async function fetchEdxCourse(courseId: string) {
                 studentData.user.name = userRes.data.name || userRes.data.full_name || studentData.user.name
                 studentData.enrolled_at = userRes.data.date_joined || userRes.data.created || studentData.enrolled_at
                 studentData.created = userRes.data.date_joined || userRes.data.created || studentData.created
-                
-                if (process.env.LTSDK_DEBUG) {
+
+                if (process.env.LTSDK_DEBUG === 'true') {
                   console.debug(`[edx connector] Email enrichment for ${username}: "${originalEmail}" -> "${studentData.email}"`)
                 }
               } else {
-                if (process.env.LTSDK_DEBUG) console.debug(`[edx connector] No user data found for ${username} from any endpoint`)
+                if (process.env.LTSDK_DEBUG === 'true') console.debug(`[edx connector] No user data found for ${username} from any endpoint`)
               }
             } catch (e) {
-              if (process.env.LTSDK_DEBUG) console.debug(`[edx connector] Failed to enrich student ${username}:`, e instanceof Error ? e.message : String(e))
+              if (process.env.LTSDK_DEBUG === 'true') console.debug(`[edx connector] Failed to enrich student ${username}:`, e instanceof Error ? e.message : String(e))
             }
           }
-          
-          // Ensure we have some enrollment date even if it's synthetic
-          if (!studentData.enrolled_at && !studentData.created) {
-            // Use course start date as fallback enrollment date
-            studentData.enrolled_at = '2025-08-01T00:00:00Z'
-            studentData.created = '2025-08-01T00:00:00Z'
-          }
-          
+
+          // If enrollment date is not available from API, leave it undefined.
+          // Adapters will handle undefined correctly.
           extractedStudents.push(studentData)
         }
       }
-      
+
       // Merge extracted students with existing students, preferring extracted ones
       const existingStudentIds = new Set(students.map((s: any) => s.user_id || s.username))
       const newStudents = extractedStudents.filter((s: any) => !existingStudentIds.has(s.user_id || s.username))
       students = [...students, ...newStudents]
-      
-      if (process.env.LTSDK_DEBUG) console.debug(`[edx connector] Extracted ${extractedStudents.length} students from gradebook, ${newStudents.length} new students added, total: ${students.length}`)
+
+      if (process.env.LTSDK_DEBUG === 'true') console.debug(`[edx connector] Extracted ${extractedStudents.length} students from gradebook, ${newStudents.length} new students added, total: ${students.length}`)
     } catch (e) {
-      if (process.env.LTSDK_DEBUG) console.debug('[edx connector] Failed to extract students from gradebook:', e instanceof Error ? e.message : String(e))
+      if (process.env.LTSDK_DEBUG === 'true') console.debug('[edx connector] Failed to extract students from gradebook:', e instanceof Error ? e.message : String(e))
     }
   }
 
   const out: any = { course, instructors, students, gradebook: gradebook && (gradebook.results || gradebook) || [], submissionsMap: {} }
-  if (process.env.LTSDK_DEBUG) {
+  if (process.env.LTSDK_DEBUG === 'true') {
     const debugObj: any = { membershipRaw: membershipRaw || null, courseMetadata: courseMetadata || null }
     // if we created a scrape blob inside membershipRaw, surface it at top-level as well
     if (membershipRaw && membershipRaw.__scrape) debugObj.scrape = membershipRaw.__scrape
@@ -260,15 +284,62 @@ export async function fetchEdxCourse(courseId: string) {
     out.__debug_membership = debugObj
   }
   return out
+
+}
+
+// Keep original fetchEdxCourse but delegate to client-aware helper when runtime creds supplied
+export async function fetchEdxCourse(courseId: string, creds?: any) {
+  if (!courseId) throw new Error('courseId required')
+  if (creds && (creds.baseUrl || creds.clientId || creds.clientSecret || creds.username || creds.accessToken)) {
+    const runtimeBase = creds.baseUrl || process.env.EDX_BASE_URL || process.env.BASE_URL || EDX_BASE
+    const runtimeToken = creds.accessToken || creds.token || undefined
+    const unauthClient = axios.create({ baseURL: runtimeBase })
+    // Try password grant token exchange if client credentials + user creds present
+    if (!runtimeToken && creds.clientId && creds.clientSecret && creds.username && creds.password) {
+      try {
+        const tokenRes = await axios.post(`${runtimeBase.replace(/\/$/, '')}/oauth2/access_token/`, new URLSearchParams({
+          grant_type: 'password',
+          username: creds.username,
+          password: creds.password,
+          client_id: creds.clientId,
+          client_secret: creds.clientSecret
+        }).toString(), {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        })
+        if (tokenRes && tokenRes.data && tokenRes.data.access_token) {
+          const tmpClient = axios.create({ baseURL: runtimeBase, headers: { Authorization: `Bearer ${tokenRes.data.access_token}` } })
+          return await fetchEdxCourseWithClient(courseId, tmpClient)
+        }
+        // If we reached here the token exchange returned no access_token
+        const err: any = new Error('edX token exchange failed with provided credentials')
+        err.status = 401
+        throw err
+      } catch (e: any) {
+        // Surface authentication failure explicitly
+        const status = e && e.response && (e.response.status === 401 || e.response.status === 403) ? e.response.status : (e && e.status ? e.status : 401)
+        const err: any = new Error('edX authentication failed: ' + (e && e.message ? e.message : 'invalid credentials'))
+        err.status = status
+        throw err
+      }
+    }
+    if (runtimeToken) {
+      const tmpClient = axios.create({ baseURL: runtimeBase, headers: { Authorization: `Bearer ${runtimeToken}` } })
+      return await fetchEdxCourseWithClient(courseId, tmpClient)
+    }
+    // No tokens present but runtime creds specify a base URL — use an unauthenticated client against that base (do not fall back to env/global client)
+    return await fetchEdxCourseWithClient(courseId, unauthClient)
+  }
+  // No runtime creds provided: fall back to global client
+  return await fetchEdxCourseWithClient(courseId, client)
 }
 
 // Simple listing/search helper for the dev server. Tries multiple discovery
 // endpoints and returns a compact array of course meta objects.
-export async function listEdxCourses(query: string = '', limit: number = 25) {
+export async function listEdxCourses(query: string = '', limit: number = 25, creds?: any) {
   try {
     if (query && query.includes('course-v1:')) {
       try {
-        const single = await fetchEdxCourse(query)
+        const single = await fetchEdxCourse(query, creds)
         if (single && single.course) {
           return [{ id: single.course.id, name: single.course.name || single.course.title || null, org: single.course.org || null, number: single.course.number || null, short_description: single.course.short_description || single.course.description || null }]
         }
@@ -287,10 +358,18 @@ export async function listEdxCourses(query: string = '', limit: number = 25) {
       `/api/publisher/v1/courses/${qs}`,
     ]
 
+    // If runtime creds provided, use a temporary client
+    let tmpClient = client
+    if (creds && (creds.baseUrl || creds.accessToken)) {
+      try {
+        tmpClient = axios.create({ baseURL: creds.baseUrl || process.env.EDX_BASE_URL || process.env.BASE_URL || EDX_BASE, headers: { Authorization: creds.accessToken ? `Bearer ${creds.accessToken}` : undefined } })
+      } catch (e) { tmpClient = client }
+    }
+
     let body: any = null
     for (const ep of endpoints) {
       try {
-        const r = await client.get(ep).catch(() => ({ data: null }))
+        const r = await tmpClient.get(ep).catch(() => ({ data: null }))
         if (r && r.data) { body = r.data; break }
       } catch (e) {
         // ignore and try next

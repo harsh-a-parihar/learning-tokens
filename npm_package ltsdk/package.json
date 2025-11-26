@@ -1,12 +1,11 @@
 {
   "name": "ltsdk",
-  "version": "1.0.5",
-  "description": "Learning Tokens SDK - Unified connector for LMS (Canvas, edX, Moodle, Google Classroom)",
+  "version": "1.0.9",
+  "description": "Learning Tokens SDK (LMS Connector) - Unified connector for LMS (Canvas, edX, Moodle, Google Classroom) to learning tokens platform",
   "main": "dist/src/index.js",
-  "types": "types/index.d.ts",
+  "types": "dist/src/index.d.ts",
   "files": [
     "dist",
-    "types",
     "local-server",
     "frontend/src",
     "frontend/public",
@@ -15,16 +14,15 @@
     "frontend/README.md",
     "env.example",
     "README.md",
-    "README-SDK.md"
+    "bin"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/harsh-a-parihar/learning-tokens.git"
+    "url": "https://github.com/hyperledger-labs/learning-tokens"
   },
-  "bugs": {
-    "url": "https://github.com/harsh-a-parihar/learning-tokens/issues"
+  "bin": {
+    "ltsdk": "./bin/ltsdk.js"
   },
-  "homepage": "https://github.com/harsh-a-parihar/learning-tokens#readme",
   "scripts": {
   "clean": "rm -rf dist",
   "build": "npm run clean && tsc",
@@ -32,9 +30,13 @@
   "test": "jest",
   "smoke": "jest --testPathPattern=tests/smoke --runInBand",
   "dev-server": "PORT=5001 node -r dotenv/config local-server/server.js",
+  "dev-auth": "LTSDK_AUTH_PORT=5002 node local-server/auth/auth-server.js",
   "dev:frontend": "cd frontend && npm start",
-  "dev:all": "concurrently \"npm run dev-server\" \"npm run dev:frontend\"",
-  "install:frontend": "cd frontend && npm install"
+  "start": "npm run dev:all:auth",
+  "dev:all:auth": "concurrently \"npm run dev-server\" \"npm run dev-auth\" \"npm run dev:frontend\"",
+  "install:frontend": "cd frontend && npm install",
+  "postinstall": "cd frontend && npm install",
+  "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [
     "lms",
@@ -45,10 +47,10 @@
     "google-classroom",
     "education",
     "learning-tokens",
-    "blockchain",
-    "edtech"
+    "edtech",
+    "ltsdk"
   ],
-  "author": "Harsh Jain",
+  "author": "Harsh Jain, Harsh Parihar",
   "license": "ISC",
   "devDependencies": {
     "@types/jest": "^29.5.14",

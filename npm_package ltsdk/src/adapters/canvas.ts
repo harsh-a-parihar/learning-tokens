@@ -1,15 +1,10 @@
-import { NormalizedPayload } from '../types'
+import { NormalizedPayload, Course } from '../types'
+import { ensureIso, createDiagnostics } from '../utils'
 
 type RawCanvasCourse = any
 
-function ensureIso(ts?: string | number): string | undefined {
-  if (!ts) return undefined
-  const d = new Date(ts)
-  return isNaN(d.getTime()) ? undefined : d.toISOString()
-}
-
 export async function normalizeCanvas(raw: RawCanvasCourse): Promise<NormalizedPayload> {
-  if (process.env.LTSDK_DEBUG) {
+  if (process.env.LTSDK_DEBUG === 'true') {
     console.log('[LTSDK] Adapter raw data keys:', Object.keys(raw || {}))
     console.log('[LTSDK] Adapter teachers array length:', (raw?.teachers || []).length)
     console.log('[LTSDK] Adapter enrollments array length:', (raw?.enrollments || []).length)
@@ -18,8 +13,10 @@ export async function normalizeCanvas(raw: RawCanvasCourse): Promise<NormalizedP
 
   const institution = raw?.account ? { id: raw.account.id?.toString?.(), name: raw.account.name } : undefined
 
-  const course = {
-    id: raw?.id?.toString?.() || 'unknown',
+  const courseId = raw?.id
+  const normalizedCourseId = courseId !== undefined && courseId !== null ? String(courseId) : 'NA'
+  const course: Course = ({
+    id: normalizedCourseId,
     name: raw?.name || raw?.course_name || undefined,
     startDate: ensureIso(raw?.start_at) || undefined,
     endDate: ensureIso(raw?.end_at) || undefined,
@@ -29,7 +26,7 @@ export async function normalizeCanvas(raw: RawCanvasCourse): Promise<NormalizedP
       account_id: raw?.account_id?.toString?.() || undefined,
       course_format: raw?.course_format || undefined
     }
-  }
+  }) as Course
 
   // Extract instructors from enrollments (teacher roles) and explicit teachers array
   const instructorsFromEnrollments = (raw?.enrollments || [])
@@ -42,7 +39,7 @@ export async function normalizeCanvas(raw: RawCanvasCourse): Promise<NormalizedP
     }))
 
   const instructorsFromTeachers = (raw?.teachers || raw?.instructors || []).map((t: any) => {
-    if (process.env.LTSDK_DEBUG) {
+    if (process.env.LTSDK_DEBUG === 'true') {
       console.log('[LTSDK] Adapter processing teacher:', JSON.stringify(t, null, 2))
     }
     return {
@@ -54,7 +51,7 @@ export async function normalizeCanvas(raw: RawCanvasCourse): Promise<NormalizedP
   })
 
   // Combine and deduplicate instructors
-  if (process.env.LTSDK_DEBUG) {
+  if (process.env.LTSDK_DEBUG === 'true') {
     console.log(`[LTSDK] Adapter instructors from enrollments: ${instructorsFromEnrollments.length}`)
     console.log(`[LTSDK] Adapter instructors from teachers: ${instructorsFromTeachers.length}`)
     console.log('[LTSDK] All instructor mappings:', JSON.stringify([...instructorsFromEnrollments, ...instructorsFromTeachers], null, 2))
@@ -75,8 +72,8 @@ export async function normalizeCanvas(raw: RawCanvasCourse): Promise<NormalizedP
           instructor_email: inst.instructor_email || existing.instructor_email,
           instructor_username: inst.instructor_username || existing.instructor_username
         }
-        if (process.env.LTSDK_DEBUG) {
-          console.log('[LTSDK] Merging instructor:', JSON.stringify({existing, new: inst, merged}, null, 2))
+        if (process.env.LTSDK_DEBUG === 'true') {
+          console.log('[LTSDK] Merging instructor:', JSON.stringify({ existing, new: inst, merged }, null, 2))
         }
         instructorsMap.set(key, merged)
       }
@@ -104,44 +101,54 @@ export async function normalizeCanvas(raw: RawCanvasCourse): Promise<NormalizedP
 
   const learnersWithAssignments = learners.map((learner: any) => {
     const id = learner.id?.toString?.()
-    console.log(`[Canvas Adapter] Processing assignments for learner ${id} (${learner.name || learner.email})`)
-    
+    if (process.env.LTSDK_DEBUG === 'true') {
+      console.log(`[Canvas Adapter] Processing assignments for learner ${id} (${learner.name || learner.email})`)
+    }
+
     const assignmentsForLearner = rawAssignments.map((a: any) => {
-      console.log(`[Canvas Adapter] Assignment ${a.id} (${a.name}): has ${a.submissions?.length || 0} total submissions`)
-      
+      if (process.env.LTSDK_DEBUG === 'true') {
+        console.log(`[Canvas Adapter] Assignment ${a.id} (${a.name}): has ${a.submissions?.length || 0} total submissions`)
+      }
+
       const submissions = Array.isArray(a.submissions) ? a.submissions.filter((s: any) => {
         const uid = s?.user_id?.toString?.() || s?.user?.id?.toString?.()
         const matches = uid === id
-        if (matches) {
+        if (matches && process.env.LTSDK_DEBUG === 'true') {
           console.log(`[Canvas Adapter] Found submission for user ${id}: score=${s.score}, entered_score=${s.entered_score}, current_score=${s.current_score}, grade=${s.grade}`)
         }
         return matches
       }) : []
-      
-      console.log(`[Canvas Adapter] Found ${submissions.length} submissions for user ${id} on assignment ${a.id}`)
+
+      if (process.env.LTSDK_DEBUG === 'true') {
+        console.log(`[Canvas Adapter] Found ${submissions.length} submissions for user ${id} on assignment ${a.id}`)
+      }
 
       // Check if we have enrollment-level grade data for this user
       const userEnrollment = (raw?.enrollments || []).find((e: any) => {
         const enrollmentUserId = e?.user_id?.toString?.() || e?.user?.id?.toString?.()
         return enrollmentUserId === id
       })
-      
-      console.log(`[Canvas Adapter] User enrollment data:`, userEnrollment ? {
-        current_score: userEnrollment.grades?.current_score,
-        final_score: userEnrollment.grades?.final_score,
-        current_grade: userEnrollment.grades?.current_grade
-      } : 'No enrollment found')
+
+      if (process.env.LTSDK_DEBUG === 'true') {
+        console.log(`[Canvas Adapter] User enrollment data:`, userEnrollment ? {
+          current_score: userEnrollment.grades?.current_score,
+          final_score: userEnrollment.grades?.final_score,
+          current_grade: userEnrollment.grades?.current_grade
+        } : 'No enrollment found')
+      }
 
       const mappedSubs = submissions.length > 0 ? submissions.map((s: any) => {
         const submitted_at = ensureIso(s?.submitted_at || s?.posted_at || s?.graded_at)
         const workflow_state = s?.workflow_state || s?.workflow || 'submitted'
         let score = s?.score ?? s?.entered_score ?? s?.entered_grade ?? s?.grade ?? null
-        
-        console.log(`[Canvas Adapter] Processing submission: score=${score}, workflow=${workflow_state}`)
-        
-        const quizGrade = (a.quizGrades && a.quizGrades.grades) ? (a.quizGrades.grades.find((g: any) => g.user_id?.toString?.() === id) ) : undefined
+
+        if (process.env.LTSDK_DEBUG === 'true') {
+          console.log(`[Canvas Adapter] Processing submission: score=${score}, workflow=${workflow_state}`)
+        }
+
+        const quizGrade = (a.quizGrades && a.quizGrades.grades) ? (a.quizGrades.grades.find((g: any) => g.user_id?.toString?.() === id)) : undefined
         const gradesArr: any[] = []
-        
+
         if (quizGrade) {
           gradesArr.push({ score: quizGrade.score ?? null, totalscore: quizGrade.points_possible ?? a.points_possible, percentage: quizGrade.percentage })
         } else if (score != null) {
@@ -149,7 +156,9 @@ export async function normalizeCanvas(raw: RawCanvasCourse): Promise<NormalizedP
           gradesArr.push({ score, totalscore: a.points_possible, percentage })
         } else if (workflow_state === 'submitted' || workflow_state === 'graded') {
           // Even if score is null, if it's submitted/graded, show it as graded with score 0
-          console.log(`[Canvas Adapter] Assignment submitted but score is null, treating as 0`)
+          if (process.env.LTSDK_DEBUG === 'true') {
+            console.log(`[Canvas Adapter] Assignment submitted but score is null, treating as 0`)
+          }
           gradesArr.push({ score: 0, totalscore: a.points_possible, percentage: 0 })
         }
 
@@ -188,13 +197,13 @@ export async function normalizeCanvas(raw: RawCanvasCourse): Promise<NormalizedP
       return assignment
     })
 
-    return { 
+    return {
       id: learner.id,
       email: learner.email,
       username: learner.username,
       name: learner.name,
       time_enrolled: learner.time_enrolled,
-      assignments: assignmentsForLearner 
+      assignments: assignmentsForLearner
     }
   })
 
@@ -206,8 +215,7 @@ export async function normalizeCanvas(raw: RawCanvasCourse): Promise<NormalizedP
     chat.push({ channel: 'discussion', messages: (raw.discussion_topics || []).flatMap((d: any) => (d?.messages || []).map((m: any) => ({ id: m.id?.toString?.(), from: m.user?.id?.toString?.(), text: m.message, ts: ensureIso(m.created_at) }))) })
   }
 
-  const diagnostics = { missingEmailCount: learnersWithAssignments.filter((l: any) => !l.email).length, notes: [] as string[] }
-  if (diagnostics.missingEmailCount > 0) diagnostics.notes!.push('Some learners had no email and were identified by username or synthetic id')
+  const diagnostics = createDiagnostics(learnersWithAssignments, 'Some learners had no email and were identified by username or synthetic id')
 
   const payload: NormalizedPayload = {
     source,

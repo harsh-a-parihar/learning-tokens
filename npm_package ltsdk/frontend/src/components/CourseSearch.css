@@ -34,8 +34,13 @@
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .search-dropdown {
@@ -134,15 +139,15 @@
     font-size: 0.875rem;
     padding: 0.625rem 0.875rem;
   }
-  
+
   .search-dropdown {
     max-height: 300px;
   }
-  
+
   .search-result-item {
     padding: 0.75rem;
   }
-  
+
   .course-details {
     flex-direction: column;
     align-items: flex-start;

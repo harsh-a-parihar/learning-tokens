@@ -1,12 +1,7 @@
 import { NormalizedPayload, Person, Course, Institution, Assessment, AssessmentItem, AssessmentResult, ChatChannel } from '../types'
+import { ensureIso, createDiagnostics } from '../utils'
 
 type RawEdxCourse = any
-
-function ensureIso(ts?: string | number): string | undefined {
-  if (!ts) return undefined
-  const d = new Date(ts)
-  return isNaN(d.getTime()) ? undefined : d.toISOString()
-}
 
 export async function normalizeEdx(raw: RawEdxCourse): Promise<NormalizedPayload> {
   // Raw is expected to possibly contain course, staff, students, gradebook, discussions
@@ -20,8 +15,10 @@ export async function normalizeEdx(raw: RawEdxCourse): Promise<NormalizedPayload
     ? { id: raw.institution.id || raw.institution.org || undefined, name: raw.institution.name }
     : undefined
 
+  const courseId = raw?.course?.id ?? raw?.course_id ?? raw?.id ?? raw?.courseId
+  const normalizedCourseId = courseId !== undefined && courseId !== null ? String(courseId) : 'NA'
   const course: Course = {
-    id: raw?.course?.id || raw?.course_id || 'unknown',
+    id: normalizedCourseId,
     name: raw?.course?.name || raw?.course?.display_name || undefined,
     startDate: ensureIso(raw?.course?.start) || raw?.course?.start || undefined,
     endDate: ensureIso(raw?.course?.end) || raw?.course?.end || undefined,
@@ -31,7 +28,7 @@ export async function normalizeEdx(raw: RawEdxCourse): Promise<NormalizedPayload
       org: raw?.course?.org,
       short_description: raw?.course?.short_description
     })
-  }
+  } as Course
 
   // Start with explicit staff/instructors provided by the raw payload
   const instructors: Person[] = (raw?.staff || raw?.instructors || []).map((s: any) => ({
@@ -67,19 +64,28 @@ export async function normalizeEdx(raw: RawEdxCourse): Promise<NormalizedPayload
     }
   }
   // Build learners list but prefer numeric/profile id when present and ensure username/name fields exist
-  const learners: Person[] = learnersRaw.map((u: any) => {
-    // support enrollment entries where `user` is a nested object
-    const nested = u && typeof u.user === 'object' ? u.user : undefined
-  // canonicalId may be numeric; stringify to satisfy schema which expects string ids
-  const rawCanonical = (u.id !== undefined && u.id !== null) ? u.id : (nested && nested.id !== undefined ? nested.id : (u.username || (nested && nested.username) || u.email || `anon:edx:${Math.random()}`))
-  const canonicalId = String(rawCanonical)
-    const username = u.username || (nested && nested.username) || (u.email ? u.email.split('@')[0] : undefined)
-    const email = u.email || (nested && nested.email) || undefined
-    const name = u.name || (nested && (nested.name || nested.full_name)) || u.display_name || undefined
-    // Add time_enrolled from enrollment data
-    const time_enrolled = ensureIso(u.created) || ensureIso(u.enrolled_at) || ensureIso(u.enrollment_date) || ensureIso(nested && nested.created) || ensureIso(nested && nested.enrolled_at) || undefined
-    return { id: canonicalId, email: email, username: username, name, time_enrolled }
-  })
+  const learners: Person[] = learnersRaw
+    .map((u: any) => {
+      const nested = u && typeof u.user === 'object' ? u.user : undefined
+      const rawCanonical = u.id ?? nested?.id ?? undefined
+      const canonicalId = rawCanonical !== undefined && rawCanonical !== null ? String(rawCanonical) : undefined
+      const username = u.username || nested?.username || (u.email ? u.email.split('@')[0] : undefined)
+      const email = u.email || nested?.email || undefined
+      const name = u.name || nested?.name || nested?.full_name || u.display_name || undefined
+      const time_enrolled =
+        ensureIso(u.created) ||
+        ensureIso(u.enrolled_at) ||
+        ensureIso(u.enrollment_date) ||
+        ensureIso(nested?.created) ||
+        ensureIso(nested?.enrolled_at) ||
+        undefined
+
+      // Skip learners that have no identifying information at all
+      if (!canonicalId && !username && !email) return undefined
+
+      return { id: canonicalId, email, username, name, time_enrolled }
+    })
+    .filter(Boolean) as Person[]
 
   const assessments: Assessment[] = []
   if (raw?.gradebook && Array.isArray(raw.gradebook)) {
@@ -102,12 +108,14 @@ export async function normalizeEdx(raw: RawEdxCourse): Promise<NormalizedPayload
   // Build per-learner assignments from gradebook (convert assessment.results -> learners[].assignments)
   // Index learners by their canonical id (which may be numeric). Also build a username->id map for lookups.
   const learnersMap: Record<string, any> = {}
-  const usernameToId: Record<string, string> = {}
+  const usernameToKey: Record<string, string> = {}
   const assignmentMaxScores: Record<string, number> = {} // Track max score for each assignment
   learners.forEach((l: any) => {
-    const sid = String(l.id)
-    learnersMap[sid] = { id: sid, email: l.email, username: l.username, name: l.name, time_enrolled: l.time_enrolled, assignments: [] }
-    if (l.username) usernameToId[String(l.username)] = sid
+    const key = l.id ?? l.username ?? l.email
+    if (!key) return
+    const keyStr = String(key)
+    learnersMap[keyStr] = { id: l.id, email: l.email, username: l.username, name: l.name, time_enrolled: l.time_enrolled, assignments: [] }
+    if (l.username) usernameToKey[String(l.username)] = keyStr
   })
 
   if (Array.isArray(raw?.gradebook)) {
@@ -134,24 +142,24 @@ export async function normalizeEdx(raw: RawEdxCourse): Promise<NormalizedPayload
         const refUsername = userRes.username || userRes.user || null
         const refEmail = userRes.email || null
         let learnerId: string | undefined = undefined
-        if (refUsername && usernameToId[refUsername] !== undefined) learnerId = usernameToId[refUsername]
+        if (refUsername && usernameToKey[refUsername] !== undefined) learnerId = usernameToKey[refUsername]
         else if (userRes.user_id) learnerId = String(userRes.user_id)
         else if (refEmail) {
           // try to find by email in learnersMap
-          const found = Object.values(learnersMap).find((ll: any) => ll.email === refEmail)
-          if (found) learnerId = String(found.id)
+          const foundEntry = Object.entries(learnersMap).find(([, ll]: [string, any]) => ll.email === refEmail)
+          if (foundEntry) learnerId = foundEntry[0]
         }
         // fallback to raw username/email if no mapping found
         if (learnerId === undefined) learnerId = refUsername || (userRes.user_id ? String(userRes.user_id) : undefined) || refEmail
         if (!learnerId) continue
         if (!learnersMap[learnerId]) {
-          learnersMap[learnerId] = { 
-            id: String(learnerId), 
+          learnersMap[learnerId] = {
+            id: String(learnerId),
             email: userRes.email || refEmail || undefined,
             username: userRes.username || refUsername || undefined,
             name: userRes.name || userRes.full_name || undefined,
             time_enrolled: ensureIso(userRes.created) || ensureIso(userRes.enrolled_at) || ensureIso(userRes.enrollment_date) || undefined,
-            assignments: [] 
+            assignments: []
           }
         }
 
@@ -203,7 +211,7 @@ export async function normalizeEdx(raw: RawEdxCourse): Promise<NormalizedPayload
             is_quiz_assignment: (sec.category && sec.category.toLowerCase() === 'quiz') || false,
             submissions: [submissionObj]
           }
-          
+
           // Only include total_questions if we have genuine data from the API
           // (edX gradebook doesn't provide question count, so we don't add fake estimates)
 
@@ -226,14 +234,13 @@ export async function normalizeEdx(raw: RawEdxCourse): Promise<NormalizedPayload
 
         const results = item.scores || []
         for (const r of results) {
-    // Resolve username to canonical id when possible (avoid duplicate learner entries)
-    let learnerId = undefined as any
-    if (r.username && usernameToId[String(r.username)]) learnerId = usernameToId[String(r.username)]
-    else learnerId = r.username || r.user_id || r.email
-        if (!learnerId) continue
-        if (!learnersMap[learnerId]) learnersMap[learnerId] = { id: learnerId, email: undefined, username: undefined, name: undefined, time_enrolled: undefined, assignments: [] }
-        
-        const score = r.score ?? null
+          let learnerId: string | undefined = undefined
+          if (r.username && usernameToKey[String(r.username)]) learnerId = usernameToKey[String(r.username)]
+          else learnerId = r.username || r.user_id || r.email
+          if (!learnerId) continue
+          if (!learnersMap[learnerId]) learnersMap[learnerId] = { id: learnerId, email: undefined, username: undefined, name: undefined, time_enrolled: undefined, assignments: [] }
+
+          const score = r.score ?? null
           const totalscore = maxScore
           const percentage = (score != null && totalscore) ? ((parseFloat(score) / parseFloat(totalscore)) * 100) : null
 
@@ -283,34 +290,25 @@ export async function normalizeEdx(raw: RawEdxCourse): Promise<NormalizedPayload
   // Convert learnersMap back to array and merge into payload
   let learnersOut = Object.values(learnersMap).map((l: any) => ({ id: l.id, email: l.email, username: l.username, name: l.name, time_enrolled: l.time_enrolled, assignments: l.assignments }))
 
-  // Deduplicate learners: prefer real users (with numeric/string ids, usernames,
-  // or emails) and remove synthetic anon:edx entries that have no assignments.
+  // Deduplicate learners: prefer real users (with numeric/string ids, usernames, or emails)
   const seenIds = new Set<string>()
   const deduped: any[] = []
   // prefer entries with assignments and with non-anon ids
   learnersOut.forEach((l: any) => {
-    const sid = String(l.id || '')
-    // If we've already seen a non-anon version of the same username/email/id, skip this one
-    const keyCandidates = [sid, String(l.username || ''), String(l.email || '')].filter(Boolean)
+    const keyCandidates: string[] = []
+    if (l.id) keyCandidates.push(`id:${l.id}`)
+    if (l.username) keyCandidates.push(`username:${l.username}`)
+    if (l.email) keyCandidates.push(`email:${l.email}`)
     const already = keyCandidates.some(k => seenIds.has(k))
     if (already) return
 
-    // If this is an anon id and it has no assignments, skip it
-    if (sid.startsWith('anon:edx:') && Array.isArray(l.assignments) && l.assignments.length === 0) {
-      return
-    }
-
-    // mark all keys as seen
     keyCandidates.forEach(k => seenIds.add(k))
     deduped.push(l)
   })
   learnersOut = deduped
 
   // Extract instructor entries from learnersOut when they appear there.
-  // Build instructorsOut from raw instructors list, but attach any assignments
-  // found in learnersOut and remove those learner entries so instructors are
-  // reported separately.
-  // Map instructors into the shape requested by the frontend consumers.
+  // Build instructorsOut from raw instructors list and map to frontend format.
   // We intentionally do NOT attach `assignments` to instructors here —
   // assignments remain under learners. The adapter will only expose
   // instructor identity and contact fields.
@@ -335,14 +333,11 @@ export async function normalizeEdx(raw: RawEdxCourse): Promise<NormalizedPayload
     return -1
   }
 
-  // Note: we no longer attach assignments to instructor objects. Instead,
-  // if a learner entry matched an instructor identity, remove that learner
-  // from learnersOut (to avoid duplicates) but DO NOT copy assignments into
-  // the instructor object — assignments belong to learners only.
+  // Remove learner entries that match instructor identities to avoid duplicates.
+  // Assignments remain with learners only, not copied to instructors.
   for (const insObj of instructorsOut) {
     const idx = matchLearnerIndexByInstructor({ id: insObj.instructor_id, username: insObj.instructor_username, email: insObj.instructor_email })
     if (idx !== -1) {
-      // remove matched learner so instructors are not duplicated in learners
       learnersOut.splice(idx, 1)
     }
   }
@@ -354,15 +349,13 @@ export async function normalizeEdx(raw: RawEdxCourse): Promise<NormalizedPayload
     chat.push({ channel: 'forum', messages: (raw.discussions.messages || []).map((m: any) => ({ id: m.id || m.pk, from: m.author || m.username, text: m.text, ts: ensureIso(m.created_at) })) })
   }
 
-  const diagnostics = { missingEmailCount: learnersOut.filter(l => !l.email).length, notes: [] as string[] }
-  if (diagnostics.missingEmailCount > 0) diagnostics.notes!.push('Some learners had no email and were identified by username or synthetic id')
+  const diagnostics = createDiagnostics(learnersOut, 'Some learners had no email and were identified by username or synthetic id')
 
   const payload: NormalizedPayload = {
     source,
     institution,
     course,
-    // Always include instructors array (may be empty) so callers can rely on the
-    // presence of this key when rendering UI.
+    // Always include instructors array (may be empty) so callers can rely on the presence of this key when rendering UI.
     instructors: instructorsOut,
     learners: learnersOut.length ? learnersOut : undefined,
     transcript: transcript.length ? transcript : undefined,

@@ -17,10 +17,10 @@
   },
   "instructors": [
     {
-      "id": "i1",
-      "email": "inst1@mit.edu",
-      "username": "instructor1",
-      "name": "Prof A"
+      "instructor_id": "i1",
+      "instructor_email": "inst1@mit.edu",
+      "instructor_username": "instructor1",
+      "instructor_name": "Prof A"
     }
   ],
   "learners": [
@@ -35,7 +35,7 @@
           "type": "assessment",
           "title": "Homework 1",
           "maxScore": 100,
-          "questions_count": 1,
+          "total_questions": 1,
           "is_quiz_assignment": false,
           "submissions": [
             {

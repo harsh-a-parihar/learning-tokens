@@ -1,30 +1,26 @@
-import { NormalizedPayload } from '../types'
+import { NormalizedPayload, Course } from '../types'
+import { ensureIso, createDiagnostics } from '../utils'
 
 type RawMoodleCourse = any
-
-function ensureIso(ts?: string | number): string | undefined {
-  if (!ts) return undefined
-  let t: any = ts
-  // numeric strings -> number
-  if (typeof t === 'string' && /^\d+$/.test(t)) t = Number(t)
-  // Moodle sometimes returns unix seconds; if timestamp looks like seconds (less than 1e12) convert to ms
-  if (typeof t === 'number' && t < 1e12) t = t * 1000
-  const d = new Date(t)
-  return isNaN(d.getTime()) ? undefined : d.toISOString()
-}
 
 export async function normalizeMoodle(raw: RawMoodleCourse): Promise<NormalizedPayload> {
   const source = { lms: 'moodle' as const, rawCourseId: raw?.id?.toString() || raw?.courseid?.toString(), fetchedAt: new Date().toISOString() }
 
   const institution = raw?.category ? { id: raw.category.id?.toString?.() || raw.category, name: raw.category_name || undefined } : undefined
 
-  const course = {
-    id: raw?.id?.toString() || raw?.courseid?.toString() || 'unknown',
-    name: raw?.fullname || raw?.name,
-    startDate: ensureIso(raw?.startdate) || undefined,
-    endDate: ensureIso(raw?.enddate) || undefined,
-    metadata: raw?.summary ? { summary: raw.summary } : {}
-  }
+  const courseId =
+    raw?.id ??
+    raw?.courseid ??
+    (raw?.course && (raw.course.id ?? raw.course.courseid)) ??
+    undefined
+  const normalizedCourseId = courseId !== undefined && courseId !== null ? String(courseId) : 'NA'
+  const course: Course = ({
+    id: normalizedCourseId,
+    name: raw?.fullname || raw?.name || (raw?.course && (raw.course.fullname || raw.course.name)),
+    startDate: ensureIso(raw?.startdate) || ensureIso(raw?.course?.startdate) || undefined,
+    endDate: ensureIso(raw?.enddate) || ensureIso(raw?.course?.enddate) || undefined,
+    metadata: raw?.summary ? { summary: raw.summary } : (raw?.course && raw.course.summary ? { summary: raw.course.summary } : {})
+  }) as Course
 
   // Format instructors to match edX/Canvas/Google Classroom structure
   const instructors = (raw?.teachers || raw?.instructors || []).map((t: any) => ({
@@ -35,12 +31,12 @@ export async function normalizeMoodle(raw: RawMoodleCourse): Promise<NormalizedP
   }))
 
   // Extract basic learner info (will be enhanced with assignments later)
-  const learners = (raw?.students || raw?.participants || []).map((u: any) => ({
+  const learners = (raw?.students || raw?.participants || raw?.course?.students || []).map((u: any) => ({
     id: u.id?.toString(),
     email: u.email,
     username: u.username || u.email,
     name: u.fullname || u.name,
-    time_enrolled: ensureIso(raw?.startdate) || undefined // Use course start date as fallback
+    time_enrolled: ensureIso(u.timecreated) || ensureIso(u.timestart) || ensureIso(u.firstaccess) || undefined
   }))
 
   const rawActivities: any[] = Array.isArray(raw?.activities) ? raw.activities.filter((act: any) => act.modname === 'quiz' || act.modname === 'assign') : []
@@ -65,15 +61,12 @@ export async function normalizeMoodle(raw: RawMoodleCourse): Promise<NormalizedP
             : null
           gradesArr.push({ score, totalscore, percentage })
         }
-        // default zero-grade for unsubmitted or missing grades
-        if ((workflow_state === 'unsubmitted' || !submissions.length) && gradesArr.length === 0) {
-          gradesArr.push({ score: 0, totalscore: act.maxgrade || act.grade || null, percentage: '00.00' })
-        }
+        // Do not fabricate default zero-grade entries when there are no submissions.
         return { submitted_at, workflow_state, grades: gradesArr }
       })
 
-      // If there were no submissions for this learner, still include an empty submission entry with default grade
-      const subs = mappedSubs.length ? mappedSubs : [{ workflow_state: 'unsubmitted', grades: [{ score: 0, totalscore: act.maxgrade || act.grade || null, percentage: '00.00' }] }]
+      // If there were no submissions for this learner, leave submissions empty (only include real fetched data)
+      const subs = mappedSubs.length ? mappedSubs : []
 
       const assignment: any = {
         id: act.id?.toString?.() || act.name,
@@ -85,7 +78,7 @@ export async function normalizeMoodle(raw: RawMoodleCourse): Promise<NormalizedP
         // Add subsection_name to match edX/Canvas/Google Classroom structure
         subsection_name: act.section || act.category || 'General'
       }
-      
+
       // Add quiz-specific fields
       if (act.modname === 'quiz') {
         assignment.quiz_id = act.modid || act.id?.toString?.() || null
@@ -103,11 +96,17 @@ export async function normalizeMoodle(raw: RawMoodleCourse): Promise<NormalizedP
 
   const chat: any[] = []
   if (raw?.forum && Array.isArray(raw.forum)) {
-    chat.push({ channel: 'forum', messages: raw.forum.flatMap((f: any) => (f?.discussions || []).flatMap((d: any) => (d?.posts || []).map((p: any) => ({ id: p.id?.toString(), from: p.userid?.toString(), text: p.message, ts: ensureIso(p.created) })) )) })
+    chat.push({ channel: 'forum', messages: raw.forum.flatMap((f: any) => (f?.discussions || []).flatMap((d: any) => (d?.posts || []).map((p: any) => ({ id: p.id?.toString(), from: p.userid?.toString(), text: p.message, ts: ensureIso(p.created) })))) })
   }
 
-  const diagnostics = { missingEmailCount: learnersWithAssignments.filter((l: any) => !l.email).length, notes: [] as string[] }
-  if (diagnostics.missingEmailCount > 0) diagnostics.notes!.push('Some learners missing email')
+  const diagnostics = createDiagnostics(learnersWithAssignments)
+
+  // Activity / submission diagnostics: help detect connector permission gaps
+  const totalActivities = rawActivities.length
+  const activitiesWithAnySubmissions = rawActivities.filter((act: any) => Array.isArray(act.submissions) && act.submissions.length > 0).length
+  const totalSubmissions = rawActivities.reduce((acc: number, act: any) => acc + (Array.isArray(act.submissions) ? act.submissions.length : 0), 0)
+    ; (diagnostics as any).activities = { total: totalActivities, withSubmissions: activitiesWithAnySubmissions, submissionsTotal: totalSubmissions }
+  if (totalActivities > 0 && activitiesWithAnySubmissions === 0) diagnostics.notes!.push('No submissions found in raw activities — connector may lack permission to fetch attempts')
 
   return {
     source,

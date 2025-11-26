@@ -13,11 +13,12 @@ const CANVAS_API_BASE = process.env.CANVAS_API_BASE || process.env.CANVAS_BASE_U
 const CANVAS_API_TOKEN = process.env.CANVAS_API_TOKEN || process.env.CANVAS_TOKEN
 const CANVAS_PROXY_URL = process.env.CANVAS_PROXY_URL
 
-export async function fetchCanvasCourse(courseId: string | number) {
-  if (process.env.LTSDK_DEBUG) {
+export async function fetchCanvasCourse(courseId: string | number, runtimeCreds?: { baseUrl?: string; accessToken?: string }) {
+  if (process.env.LTSDK_DEBUG === 'true') {
     console.log('[LTSDK] Canvas env check - CANVAS_PROXY_URL:', CANVAS_PROXY_URL)
     console.log('[LTSDK] Canvas env check - CANVAS_API_BASE:', CANVAS_API_BASE)
     console.log('[LTSDK] Canvas env check - CANVAS_API_TOKEN length:', (CANVAS_API_TOKEN || '').length)
+    console.log('[LTSDK] Canvas runtimeCreds provided:', !!runtimeCreds)
   }
 
   // If a local proxy is provided, use it (no token required)
@@ -80,14 +81,19 @@ export async function fetchCanvasCourse(courseId: string | number) {
     }
   }
 
-  if (!CANVAS_API_BASE || !CANVAS_API_TOKEN) throw new Error('Canvas API base or token not configured in env')
+  // Use runtime credentials if provided, otherwise fall back to environment variables
+  const baseUrl = runtimeCreds?.baseUrl || CANVAS_API_BASE || process.env.CANVAS_API_BASE || process.env.CANVAS_BASE_URL
+  const accessToken = runtimeCreds?.accessToken || CANVAS_API_TOKEN || process.env.CANVAS_API_TOKEN || process.env.CANVAS_TOKEN
+
+  if (!baseUrl || !accessToken) {
+    throw new Error('Canvas API base or token not configured')
+  }
 
   // Normalize provided base so we never double-up the /api/v1 segment. Then use
   // relative paths (e.g. /courses/:id) against that base.
-  // Prefer explicitly configured CANVAS_API_BASE, fall back to other env names.
-  const rawBase = (CANVAS_API_BASE || process.env.CANVAS_API_BASE || process.env.CANVAS_BASE_URL || '').replace(/\/+$/, '')
+  const rawBase = (baseUrl || '').replace(/\/+$/, '')
   const apiBase = rawBase.replace(/(\/api\/v1)$/i, '') + '/api/v1'
-  const client = axios.create({ baseURL: apiBase, headers: { Authorization: `Bearer ${CANVAS_API_TOKEN}` } })
+  const client = axios.create({ baseURL: apiBase, headers: { Authorization: `Bearer ${accessToken}` } })
 
   // Fetch course details, users, assignments, discussions as basic example
   const [courseRes, usersRes, assignmentsRes, discussionsRes] = await Promise.all([
@@ -96,24 +102,24 @@ export async function fetchCanvasCourse(courseId: string | number) {
     client.get(`/courses/${courseId}/assignments`),
     client.get(`/courses/${courseId}/discussion_topics`)
   ])
-  
+
   // Fetch submissions for each assignment
   const assignments = assignmentsRes.data || []
-  if (process.env.LTSDK_DEBUG) {
+  if (process.env.LTSDK_DEBUG === 'true') {
     console.log(`[LTSDK] Fetching submissions for ${assignments.length} assignments...`)
   }
-  
+
   for (const assignment of assignments) {
     try {
       const submissionsRes = await client.get(`/courses/${courseId}/assignments/${assignment.id}/submissions`, {
         params: { include: ['submission_history', 'submission_comments', 'rubric_assessment', 'user'] }
       })
       assignment.submissions = submissionsRes.data || []
-      if (process.env.LTSDK_DEBUG) {
+      if (process.env.LTSDK_DEBUG === 'true') {
         console.log(`[LTSDK] Assignment ${assignment.id} (${assignment.name}): fetched ${assignment.submissions.length} submissions`)
       }
     } catch (err) {
-      if (process.env.LTSDK_DEBUG) {
+      if (process.env.LTSDK_DEBUG === 'true') {
         console.log(`[LTSDK] Error fetching submissions for assignment ${assignment.id}:`, (err as any).message)
       }
       assignment.submissions = []
@@ -122,25 +128,25 @@ export async function fetchCanvasCourse(courseId: string | number) {
 
   // Try to get enrollments separately
   let enrollmentsRes
-  if (process.env.LTSDK_DEBUG) {
+  if (process.env.LTSDK_DEBUG === 'true') {
     console.log('[LTSDK] Attempting to fetch enrollments...')
   }
   try {
     enrollmentsRes = await client.get(`/courses/${courseId}/enrollments`, {
       params: { include: ['grades'] }  // Include grade data in enrollments
     })
-    if (process.env.LTSDK_DEBUG) {
+    if (process.env.LTSDK_DEBUG === 'true') {
       console.log('[LTSDK] Successfully fetched enrollments with grades')
     }
   } catch (err) {
-    if (process.env.LTSDK_DEBUG) {
+    if (process.env.LTSDK_DEBUG === 'true') {
       console.log('[LTSDK] Error fetching enrollments:', (err as any).message || err)
     }
     enrollmentsRes = { data: [] }
   }
 
   // Separate teachers and students using enrollment data
-  if (process.env.LTSDK_DEBUG) {
+  if (process.env.LTSDK_DEBUG === 'true') {
     console.log('[LTSDK] Raw users response:', JSON.stringify(usersRes.data, null, 2))
     console.log('[LTSDK] Raw enrollments response:', JSON.stringify(enrollmentsRes.data, null, 2))
   }
@@ -148,7 +154,7 @@ export async function fetchCanvasCourse(courseId: string | number) {
   // Create maps from enrollments to identify teachers vs students
   const teacherIds = new Set()
   const studentIds = new Set()
-  
+
   enrollmentsRes.data.forEach((enrollment: any) => {
     if (enrollment.type === 'TeacherEnrollment' || enrollment.role === 'TeacherEnrollment') {
       teacherIds.add(enrollment.user_id)
@@ -160,11 +166,11 @@ export async function fetchCanvasCourse(courseId: string | number) {
   const teachers = usersRes.data.filter((u: any) => teacherIds.has(u.id))
   const students = usersRes.data.filter((u: any) => studentIds.has(u.id))
 
-  if (process.env.LTSDK_DEBUG) {
+  if (process.env.LTSDK_DEBUG === 'true') {
     console.log(`[LTSDK] Filtered teachers: ${teachers.length}, students: ${students.length}`)
     console.log('[LTSDK] Teacher IDs:', Array.from(teacherIds))
     console.log('[LTSDK] Student IDs:', Array.from(studentIds))
-    console.log('[LTSDK] Teachers:', JSON.stringify(teachers.map((t: any) => ({id: t.id, name: t.name, email: t.email})), null, 2))
+    console.log('[LTSDK] Teachers:', JSON.stringify(teachers.map((t: any) => ({ id: t.id, name: t.name, email: t.email })), null, 2))
   }
 
   // Normalize raw structure to what the adapter expects. The adapter already handles many shapes.
@@ -176,13 +182,13 @@ export async function fetchCanvasCourse(courseId: string | number) {
     discussion_topics: discussionsRes.data,
     enrollments: enrollmentsRes.data  // IMPORTANT: Include enrollments for grade data!
   }
-  
-  if (process.env.LTSDK_DEBUG) {
+
+  if (process.env.LTSDK_DEBUG === 'true') {
     console.log('[LTSDK] Connector final return keys:', Object.keys(result))
     console.log('[LTSDK] Connector final teachers length:', result.teachers.length)
     console.log('[LTSDK] Connector final enrollments length:', result.enrollments?.length || 0)
   }
-  
+
   return result
 }
 
@@ -190,21 +196,21 @@ export default fetchCanvasCourse
 
 // Simple listing/search helper for the dev server. Tries multiple discovery
 // endpoints and returns a compact array of course meta objects.
-export async function listCanvasCourses(query: string = '', limit: number = 25) {
+export async function listCanvasCourses(query: string = '', limit: number = 25, runtimeCreds?: { baseUrl?: string; accessToken?: string }) {
   try {
     // If a local proxy is provided, use it (no token required)
     if (CANVAS_PROXY_URL) {
       const client = axios.create({ baseURL: CANVAS_PROXY_URL })
       const res = await client.get('/courses').catch(() => ({ data: [] }))
       const courses = Array.isArray(res.data) ? res.data : []
-      
+
       // Apply search filter if query provided
-      const filtered = query ? courses.filter(c => 
+      const filtered = query ? courses.filter(c =>
         (c.name && c.name.toLowerCase().includes(query.toLowerCase())) ||
         (c.course_code && c.course_code.toLowerCase().includes(query.toLowerCase())) ||
         (c.id && String(c.id).includes(query))
       ) : courses
-      
+
       return filtered.slice(0, limit).map(c => ({
         id: c.id || null,
         name: c.name || c.title || null,
@@ -215,26 +221,30 @@ export async function listCanvasCourses(query: string = '', limit: number = 25) 
       }))
     }
 
-    if (!CANVAS_API_BASE || !CANVAS_API_TOKEN) {
-      throw new Error('Canvas API base or token not configured in env')
+    // Use runtime credentials if provided, otherwise fall back to env vars
+    const baseUrl = runtimeCreds?.baseUrl || CANVAS_API_BASE || process.env.CANVAS_API_BASE || process.env.CANVAS_BASE_URL
+    const accessToken = runtimeCreds?.accessToken || CANVAS_API_TOKEN || process.env.CANVAS_API_TOKEN || process.env.CANVAS_TOKEN
+
+    if (!baseUrl || !accessToken) {
+      throw new Error('Canvas API base or token not configured')
     }
 
     // Use the same base URL normalization as fetchCanvasCourse
-    const rawBase = (CANVAS_API_BASE || process.env.CANVAS_API_BASE || process.env.CANVAS_BASE_URL || '').replace(/\/+$/, '')
+    const rawBase = (baseUrl || '').replace(/\/+$/, '')
     const apiBase = rawBase.replace(/(\/api\/v1)$/i, '') + '/api/v1'
-    const client = axios.create({ baseURL: apiBase, headers: { Authorization: `Bearer ${CANVAS_API_TOKEN}` } })
+    const client = axios.create({ baseURL: apiBase, headers: { Authorization: `Bearer ${accessToken}` } })
 
     // Fetch courses from Canvas API
     const res = await client.get('/courses', { params: { per_page: limit, state: ['available', 'completed'] } })
     const courses = Array.isArray(res.data) ? res.data : []
-    
+
     // Apply search filter if query provided
-    const filtered = query ? courses.filter(c => 
+    const filtered = query ? courses.filter(c =>
       (c.name && c.name.toLowerCase().includes(query.toLowerCase())) ||
       (c.course_code && c.course_code.toLowerCase().includes(query.toLowerCase())) ||
       (c.id && String(c.id).includes(query))
     ) : courses
-    
+
     return filtered.map(c => ({
       id: c.id || null,
       name: c.name || c.title || null,
@@ -244,6 +254,9 @@ export async function listCanvasCourses(query: string = '', limit: number = 25) 
       workflow_state: c.workflow_state || null
     }))
   } catch (e) {
+    if (process.env.LTSDK_DEBUG === 'true') {
+      console.error('[LTSDK] listCanvasCourses error:', e instanceof Error ? e.message : String(e))
+    }
     return []
   }
 }

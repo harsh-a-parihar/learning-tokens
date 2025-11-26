@@ -45,15 +45,60 @@ const MoodleIcon = () => (
   </svg>
 )
 
-const links = [
-  { to: '/', label: 'Dashboard', icon: DashboardIcon },
-  { to: '/edx', label: 'edX', icon: EdxIcon },
-  { to: '/canvas', label: 'Canvas', icon: CanvasIcon },
-  { to: '/google-classroom', label: 'Google Classroom', icon: GoogleIcon },
-  { to: '/moodle', label: 'Moodle', icon: MoodleIcon }
+const allLinks = [
+  { to: '/dashboard', label: 'Dashboard', icon: DashboardIcon, id: 'dashboard' },
+  { to: '/edx', label: 'edX courses', icon: EdxIcon, id: 'edx' },
+  { to: '/canvas', label: 'Canvas courses', icon: CanvasIcon, id: 'canvas' },
+  { to: '/google-classroom', label: 'Google Classroom courses', icon: GoogleIcon, id: 'google-classroom' },
+  { to: '/moodle', label: 'Moodle courses', icon: MoodleIcon, id: 'moodle' }
 ]
 
 export default function Sidebar() {
+  const [allowedLms, setAllowedLms] = React.useState(null)
+  const [authenticated, setAuthenticated] = React.useState(false)
+
+  React.useEffect(() => {
+    let mounted = true
+    const fetchSession = async () => {
+      try {
+        const resp = await fetch('http://localhost:5002/auth/session', { credentials: 'include' })
+        if (!mounted) return
+        if (!resp.ok) {
+          setAuthenticated(false)
+          setAllowedLms(null)
+          return
+        }
+        const json = await resp.json()
+        if (json && json.authenticated) {
+          setAuthenticated(true)
+          setAllowedLms(json.session && json.session.allowedLms)
+        } else {
+          setAuthenticated(false)
+          setAllowedLms(null)
+        }
+      } catch (e) {
+        if (mounted) {
+          setAuthenticated(false)
+          setAllowedLms(null)
+        }
+      }
+    }
+    fetchSession()
+    return () => { mounted = false }
+  }, [])
+
+  // Filter links: always show Dashboard, only show the authenticated LMS
+  const visibleLinks = React.useMemo(() => {
+    if (!authenticated || !allowedLms) {
+      // If not authenticated, show all links (will be redirected by pages anyway)
+      return allLinks
+    }
+    // Show Dashboard + the authenticated LMS only
+    return allLinks.filter(link =>
+      link.id === 'dashboard' || link.id === allowedLms
+    )
+  }, [authenticated, allowedLms])
+
   return (
     <aside className="lt-sidebar">
       <div className="lt-header">
@@ -65,11 +110,11 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
-      
+
       <nav className="lt-nav">
         <div className="lt-nav-section">
           <div className="lt-nav-label">Navigation</div>
-          {links.map(l => {
+          {visibleLinks.map(l => {
             const IconComponent = l.icon
             return (
               <NavLink
@@ -86,15 +131,33 @@ export default function Sidebar() {
           })}
         </div>
       </nav>
-      
+
       <div className="lt-footer">
         <div className="lt-sdk-status">
           <div className="lt-status-indicator"></div>
           <div className="lt-sdk-info">
             <div className="lt-sdk-label">SDK Connected</div>
-            <div className="lt-sdk-url">{process.env.REACT_APP_SDK_BASE_URL || 'localhost:5001'}</div>
           </div>
         </div>
+        {authenticated && (
+          <button
+            className="lt-logout-btn"
+            onClick={async () => {
+              try {
+                await fetch('http://localhost:5002/auth/logout', { method: 'POST', credentials: 'include' })
+              } catch (e) { }
+              // reload to clear client state
+              window.location.href = '/lms-select'
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            Logout
+          </button>
+        )}
       </div>
     </aside>
   )

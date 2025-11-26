@@ -9,7 +9,8 @@
     "react-router-dom": "^6.8.0",
     "react-scripts": "5.0.1",
     "axios": "^1.7.7",
-    "dotenv": "^17.0.1"
+    "dotenv": "^17.0.1",
+    "http-proxy-middleware": "^2.0.6"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -17,7 +18,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
-  "proxy": "http://local.openedx.io",
+  
   "eslintConfig": {
     "extends": [
       "react-app",
