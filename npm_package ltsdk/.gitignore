@@ -1,6 +1,6 @@
 # Node deps
 node_modules/
-
+dist/
 # Lockfiles
 package-lock.json
 
