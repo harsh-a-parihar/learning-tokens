@@ -8,6 +8,7 @@ import { useSelector } from "react-redux";
 import axios from "axios";
 import { SuccessModal } from "../../components/Modal/SuccessModal";
 import { useEventContext } from "../../contexts/EventContext";
+import { useParams } from "react-router-dom";
 
 const validationSchema = object().shape({
   courseName: string().required("Course Name is required."),
@@ -15,6 +16,7 @@ const validationSchema = object().shape({
 });
 
 const CreateCourse = () => {
+  const { id } = useParams();
   const formikRef = useRef<any>(null);
   const auth = useSelector((state: RootState) => state.auth);
   const [learnersList, setLearnersList] = useState([]);
@@ -22,17 +24,57 @@ const CreateCourse = () => {
   const [isModalVisible, setModalVisible] = useState(false);
   const [formEditable, setFormEditable] = useState(true);
   const [modalMessage, setModalMessage] = useState("");
-  const { eventData } = useEventContext();
+  const { eventData, setEventData } = useEventContext();
 
+  // 1. Fetch Event Data (Always fetch to ensure fresh status)
   useEffect(() => {
-    if (eventData?.eventName && learnersList.length>0 && eventData?.status !== "reviewWallets") {
-      setFormEditable(false);
-    }
-  }, [eventData?.eventName, learnersList.length]);
+    const fetchEventData = async () => {
+      if (id) {
+        try {
+          console.log(`[CreateCourse] Fetching fresh event data for ID: ${id}`);
+          const response = await axios.get(`${import.meta.env.VITE_API_URL}/event/${id}`, {
+            headers: {
+              Authorization: `Bearer ${auth.accessToken}`,
+            },
+          });
+          console.log('[CreateCourse] Event data fetched:', response.data);
+          setEventData(response.data);
+        } catch (error) {
+          console.error("[CreateCourse] Error fetching event data:", error);
+        }
+      }
+    };
 
+    fetchEventData();
+  }, [id, auth.accessToken, setEventData]);
+
+  // 2. Check status to disable form
+  useEffect(() => {
+    if (eventData?.eventName && learnersList.length > 0 && eventData?.status !== "reviewWallets") {
+      // If status is NOT reviewWallets (e.g. it's tokenDistribution or completed), disable form
+      // Wait, if we are IN reviewWallets step, form should be editable unless already created?
+      // Actually logic should be: if course is already created, disable.
+      // Let's assume 'reviewWallets' is the current active step. 
+      // If we moved past it, disable.
+      
+      // Better check: if onlineEvent.courseCreateStatus is true
+      if (eventData?.onlineEvent?.courseCreateStatus) {
+         setFormEditable(false);
+      }
+    }
+  }, [eventData, learnersList.length]);
+
+  // 3. Fetch Learners List (Depends on eventData)
   useEffect(() => {
     const fetchLearnersList = async () => {
+      // Guard: Only proceed if we have a numeric ID from eventData
+      if (!eventData?.id) {
+        console.log("[CreateCourse] Waiting for eventData ID...");
+        return; 
+      }
+
       try {
+        // Fetch all learners (Admin)
         const response = await axios.get(`${import.meta.env.VITE_API_URL}/admin/learner-list`, {
           headers: {
             Authorization: `Bearer ${auth.accessToken}`,
@@ -42,8 +84,10 @@ const CreateCourse = () => {
         const allLearners = response?.data?.result?.data || [];
         setLearnersList(allLearners);
         
-        // Fetch event details
-        const eventResponse = await axios.get(`${import.meta.env.VITE_API_URL}/postevent/${eventData?.id}`);
+        // Fetch learners associated with this event (Postevent)
+        // Use the numeric ID from eventData
+        console.log(`[CreateCourse] Fetching post-events for event ID: ${eventData.id}`);
+        const eventResponse = await axios.get(`${import.meta.env.VITE_API_URL}/postevent/${eventData.id}`);
         const eventLearnersEmails = eventResponse.data.map((learner: any) => learner.email);
 
         // Filter learnersList by the emails fetched from the event
@@ -53,15 +97,15 @@ const CreateCourse = () => {
 
         setFilteredLearnersList(filteredLearners);
       } catch (error) {
-        console.error("Error fetching learners list:", error);
+        console.error("[CreateCourse] Error fetching learners list:", error);
       }
     };
 
     fetchLearnersList();
-  }, [auth.accessToken]);
+  }, [auth.accessToken, eventData?.id]); // Depend on eventData.id
 
   const initialValues = {
-    courseName: eventData?.eventName,
+    courseName: eventData?.eventName || "",
     learnersList: [],
   };
 
@@ -81,12 +125,32 @@ const CreateCourse = () => {
       console.log(`response: ${response.data}`);
 
       if (response.status === 201) {
-        setModalMessage(response.data.message);
+        const message = response.data.message || 'Course created successfully';
+        setModalMessage(message);
         setModalVisible(true);
         setFormEditable(false);
+        // Refresh event data to get updated courseCreateStatus
+        if (eventData?.id) {
+          try {
+            const eventResponse = await axios.get(`${import.meta.env.VITE_API_URL}/preevent/${eventData.id}`, {
+              headers: {
+                Authorization: `Bearer ${auth.accessToken}`,
+              },
+            });
+            // Update eventData in context if needed
+          } catch (err) {
+            console.error("Error refreshing event data:", err);
+          }
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating course:", error);
+      const errorMessage = error.response?.data?.message || 
+                           error.response?.data?.error || 
+                           error.message || 
+                           'Failed to create course. Please try again.';
+      setModalMessage(`Error: ${errorMessage}`);
+      setModalVisible(true);
     }
   };
 

@@ -9,7 +9,6 @@ const path = require('path');
 
 const PORT = process.env.LTSDK_AUTH_PORT || 5002;
 const CONFIG_PATH = path.join(__dirname, '..', 'config.auth.json');
-const KEYS_PATH = path.join(__dirname, 'keys.json');
 
 let state = {
   university: null,
@@ -22,7 +21,14 @@ let state = {
 // Temporary pending OAuth flows keyed by state -> { lms, clientId, clientSecret, redirectUri, createdAt }
 const pendingAuths = {};
 
-let validKeys = [];
+// Hardcoded valid keys (replacing keys.json)
+const validKeys = [
+  { key: 'LTSDK-2024-STANFORD-A1B2C3D4', university: 'stanford', status: 'active' },
+  { key: 'LTSDK-2024-MIT-E5F6G7H8', university: 'mit', status: 'active' },
+  { key: 'LTSDK-2024-HARVARD-I9J0K1L2', university: 'harvard', status: 'active' },
+  { key: 'LTSDK-2024-BERKELEY-M3N4O5P6', university: 'berkeley', status: 'active' },
+  { key: 'LTSDK-2024-OXFORD-Q7R8S9T0', university: 'oxford', status: 'active' }
+];
 
 function loadState() {
   try {
@@ -34,22 +40,6 @@ function loadState() {
     }
   } catch (e) {
     console.error('[auth-server] loadState error:', e.message);
-  }
-}
-
-function loadKeys() {
-  try {
-    if (fs.existsSync(KEYS_PATH)) {
-      const raw = fs.readFileSync(KEYS_PATH, 'utf8');
-      const parsed = JSON.parse(raw || '{}');
-      validKeys = parsed.validKeys || [];
-      console.log(`[auth-server] Loaded ${validKeys.length} valid LTSDK keys`);
-    } else {
-      console.warn('[auth-server] keys.json not found - no valid keys loaded');
-    }
-  } catch (e) {
-    console.error('[auth-server] loadKeys error:', e.message);
-    validKeys = [];
   }
 }
 
@@ -427,7 +417,6 @@ function respondWithAuthSuccess(req, res, lms, credentials, tokenResult, createS
 }
 
 loadState();
-loadKeys();
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {

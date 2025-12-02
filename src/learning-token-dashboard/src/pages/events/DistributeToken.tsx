@@ -9,6 +9,7 @@ import { SmartcontractFunctionsEnum } from "../../enums/smartcontract-functions.
 import axios from "axios";
 import { RootState } from "../../store";
 import { useSelector } from "react-redux";
+import { useParams } from "react-router-dom";
 
 const initialValues = {
   token_type: "attendance_token",
@@ -30,8 +31,9 @@ const validationSchema = object().shape({
     .required("At least 1 attendance should be added"),
 });
 const DistributeToken = () => {
+  const { id } = useParams();
   const formikRef = useRef<FormikProps<any>>(null);
-  const { eventData } = useEventContext();
+  const { eventData, setEventData } = useEventContext();
   const [isModalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
   const auth = useSelector((state: RootState) => state.auth);
@@ -39,22 +41,71 @@ const DistributeToken = () => {
   const [filteredLearnersList, setFilteredLearnersList] = useState([]);
   const [selectedLearners, setSelectedLearners] = useState<Record<number, boolean>>({});
   const [allSelected, setAllSelected] = useState(false);
+  const [courseCreated, setCourseCreated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // 1. Fetch Event Data (Always fetch to ensure fresh status)
   useEffect(() => {
-    const fetchLearnersList = async () => {
+    const fetchEventData = async () => {
+      if (id) {
+        try {
+          // Only show loading if we don't have data yet, or if we want to ensure strict freshness
+          if (!eventData) setIsLoading(true);
+          
+          console.log(`[DistributeToken] Fetching fresh event data for ID: ${id}`);
+          const response = await axios.get(`${import.meta.env.VITE_API_URL}/event/${id}`, {
+            headers: {
+              Authorization: `Bearer ${auth.accessToken}`,
+            },
+          });
+          console.log('[DistributeToken] Event data fetched:', response.data);
+          setEventData(response.data);
+        } catch (error) {
+          console.error("[DistributeToken] Error fetching event data:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchEventData();
+  }, [id, auth.accessToken, setEventData]);
+
+  // 2. Fetch Learners and Event Details (Depends on eventData)
+  useEffect(() => {
+    const fetchEventAndLearners = async () => {
+      // Guard: Only proceed if we have a numeric ID from eventData
+      if (!eventData?.id) {
+        if (id && !eventData) {
+           // If we have URL ID but no eventData yet, keep loading true (waiting for fetchEventData)
+           return;
+        }
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/admin/learner-list`, {
+        setIsLoading(true);
+        
+        // Check if course was created on-chain
+        // We use eventData directly as it should be populated now
+        const courseCreateStatus = eventData?.onlineEvent?.courseCreateStatus;
+        setCourseCreated(!!courseCreateStatus);
+
+        // Fetch learners list (Admin)
+        const learnersResponse = await axios.get(`${import.meta.env.VITE_API_URL}/admin/learner-list`, {
           headers: {
             Authorization: `Bearer ${auth.accessToken}`,
           },
         });
 
-        const allLearners = response?.data?.result?.data || [];
+        const allLearners = learnersResponse?.data?.result?.data || [];
         setLearnersList(allLearners);
-
-        // Fetch event details
-        const eventResponse = await axios.get(`${import.meta.env.VITE_API_URL}/postevent/${eventData?.id}`);
-        const eventLearnersEmails = eventResponse.data.map((learner: any) => learner.email);
+        
+        // Fetch event attendees (Postevent) using numeric ID
+        console.log(`[DistributeToken] Fetching post-events for event ID: ${eventData.id}`);
+        const posteventResponse = await axios.get(`${import.meta.env.VITE_API_URL}/postevent/${eventData.id}`);
+        const eventLearnersEmails = posteventResponse.data.map((learner: any) => learner.email);
 
         // Filter learnersList by the emails fetched from the event
         const filteredLearners = allLearners.filter((learner: any) =>
@@ -63,12 +114,14 @@ const DistributeToken = () => {
 
         setFilteredLearnersList(filteredLearners);
       } catch (error) {
-        console.error("Error fetching learners list:", error);
+        console.error("Error fetching event and learners list:", error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchLearnersList();
-  }, []);
+    fetchEventAndLearners();
+  }, [eventData, auth.accessToken, id]); // Depend on eventData (deep check or key properties)
 
   useEffect(() => {
     // Update selectedLearners based on allSelected
@@ -93,6 +146,13 @@ const DistributeToken = () => {
   }
 
   const handleSubmit = async (values: any) => {
+    // Check if course was created before allowing distribution
+    if (!courseCreated) {
+      setModalMessage('Error: Course must be created on-chain before distributing tokens. Please go back to "Review Wallets" step and click "Create Course" button first.');
+      setModalVisible(true);
+      return;
+    }
+
     console.log("Form Submitted with values:", values);
 
     const hasSelectedLearners = Object.values(selectedLearners).some((selected) => selected);
@@ -103,6 +163,12 @@ const DistributeToken = () => {
         .map((learner) => (Number(learner)));
     } else { // If no learners are selected, submit all learners
       submitSelectedLearnerList = filteredLearnersList.map((learner) => learner.id);
+    }
+
+    if (!submitSelectedLearnerList || submitSelectedLearnerList.length === 0) {
+      setModalMessage('Error: Please select at least one learner to distribute tokens to.');
+      setModalVisible(true);
+      return;
     }
 
     values.learnersList = submitSelectedLearnerList;
@@ -119,7 +185,9 @@ const DistributeToken = () => {
         functionName = SmartcontractFunctionsEnum.BATCH_MINT_INSTRUCTOR_SCORE_TOKEN;
         break;
       default:
-        break;
+        setModalMessage('Error: Please select a valid token type.');
+        setModalVisible(true);
+        return;
     }
 
     console.log(`selectedLearnerList: ${values.learnersList}`);
@@ -136,11 +204,18 @@ const DistributeToken = () => {
       });
 
       if (response.status === 201) {
-        setModalMessage(response.data.message);
+        const message = response.data.message || 'Tokens distributed successfully';
+        setModalMessage(message);
         setModalVisible(true);
       }
-    } catch (error) {
-      console.error("Error creating course:", error);
+    } catch (error: any) {
+      console.error("Error distributing tokens:", error);
+      const errorMessage = error.response?.data?.message || 
+                           error.response?.data?.error || 
+                           error.message || 
+                           'Failed to distribute tokens. Please try again.';
+      setModalMessage(`Error: ${errorMessage}`);
+      setModalVisible(true);
     }
   };
 
@@ -161,6 +236,39 @@ const DistributeToken = () => {
     //   label: "Batch Instructor Score Token",
     // },
   ];
+
+  if (isLoading) {
+    return (
+      <Container className="my-4">
+        <Card className="p-4" style={{ width: '600px', margin: 'auto' }}>
+          <Card.Body>
+            <div className="text-center">Loading...</div>
+          </Card.Body>
+        </Card>
+      </Container>
+    );
+  }
+
+  if (!courseCreated) {
+    return (
+      <Container className="my-4">
+        <Card className="p-4" style={{ width: '600px', margin: 'auto' }}>
+          <Card.Body>
+            <div className="alert alert-warning" role="alert">
+              <h5 className="alert-heading">Course Not Created</h5>
+              <p>
+                The course must be created on-chain before you can distribute tokens.
+              </p>
+              <hr />
+              <p className="mb-0">
+                Please go back to the <strong>"Review Wallets"</strong> step and click the <strong>"Create Course"</strong> button first.
+              </p>
+            </div>
+          </Card.Body>
+        </Card>
+      </Container>
+    );
+  }
 
   return (
     <Container className="my-4">

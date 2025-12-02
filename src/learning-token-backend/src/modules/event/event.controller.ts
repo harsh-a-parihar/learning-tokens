@@ -33,7 +33,8 @@ export class EventController {
 
     @Get(':id')
     findOne(@Param('id') id: string) {
-        return this.eventService.findOne(+id)
+        // Pass as string to let service decide if it's ID or meetingEventId
+        return this.eventService.findOne(id)
     }
 
     @Patch(':id')

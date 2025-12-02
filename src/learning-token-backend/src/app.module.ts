@@ -16,6 +16,8 @@ import { PosteventModule } from './modules/postevent/postevent.module'
 import { SmartcontractModule } from './modules/smartcontract/smartcontract.module'
 import { EventModule } from './modules/event/event.module'
 import { SeederModule } from './modules/role/seeder/seeder.module'
+import { LmsIntegrationModule } from './modules/lms-integration/lms-integration.module'
+
 @Module({
     imports: [
         ConfigModule.forRoot({
@@ -35,7 +37,8 @@ import { SeederModule } from './modules/role/seeder/seeder.module'
         PosteventModule,
         SmartcontractModule,
         EventModule,
-        SeederModule
+        SeederModule,
+        LmsIntegrationModule
     ],
     controllers: [AppController],
     providers: [AppService],

@@ -19,12 +19,28 @@ services:
             - REDIS_HOST=redis
             - REDIS_PORT=6379
             - REDIS_TTL=600
+            # Kaleido Env Vars - MUST match code expectations
+            - KALEIDO_HD_WALLET_RPC_URL
+            - KALEIDO_RPC_URL
+            - INSTITUTION_HD_WALLET_ID
+            - INSTITUTION_PUB_KEY
+            - ADMIN_HD_WALLET_ID
+            - SUPER_ADMIN_PUB_KEY
+            - INSTRUCTOR_HD_WALLET_ID
+            - INSTRUCTOR_PUB_KEY
+            - LEARNER_HD_WALLET_ID
+            - LEARNER1_PUB_KEY
+            - ADMIN_PUBLIC_KEY
+            - PINATA_JWT
         build:
             context: .
             dockerfile: ./Dockerfile
         volumes:
             - .:/app # Mount the current directory to /app in the container
             - /app/node_modules # Keep node_modules separate
+            - /app/dist # Keep dist separate to avoid file system sync issues
+        env_file:
+            - .env
 
     postgres:
         image: postgres:latest

@@ -9,5 +9,5 @@ export class DistributeTokenDto {
     functionName: string
 
     @IsOptional()
-    userIds: []
+    userIds: number[]
 }

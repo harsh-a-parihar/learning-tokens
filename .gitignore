@@ -5,3 +5,6 @@ src/.DS_Store
 *.mjs
 /src/learning-token-backend/.yarn
 .env
+node_modules/
+package-lock.json
+.vscode/

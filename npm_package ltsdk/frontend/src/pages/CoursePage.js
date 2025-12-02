@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import lmsSdkClient from '../services/lmsSdkClient'
 import '../components/EdxPage.css'
 
+import { syncLmsDataToLearningTokens } from '../services/LmsSync'
+
 // Progress Bar Component
 const ProgressBar = ({ steps, currentStep }) => {
   return (
@@ -102,6 +104,17 @@ export default function CoursePage() {
   const [currentStep, setCurrentStep] = useState(0)
   const [confirmed, setConfirmed] = useState(false)
   const [expandedIds, setExpandedIds] = useState(new Set())
+  
+  // Additional fields required for Learning Tokens import
+  const [ltCategory, setLtCategory] = useState('General Education')
+  const [ltSkills, setLtSkills] = useState('Completion')
+  
+  // Login Modal State
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [loginError, setLoginError] = useState(null)
 
   const steps = [
     { id: 'course', title: 'Course Info' },
@@ -357,53 +370,128 @@ export default function CoursePage() {
   }
 
   // Learning Tokens backend URL (where the normalized payload will be POSTed)
-  const LT_BACKEND = process.env.REACT_APP_LT_BACKEND_URL || 'http://localhost:3001'
+  const LT_BACKEND = process.env.REACT_APP_LT_BACKEND_URL || 'http://localhost:3000'
   const [sendingToLT, setSendingToLT] = useState(false)
 
-  const sendCourseToLearningTokens = async () => {
-    if (!course) return
-    setSendingToLT(true)
+  const handleAssignTokensClick = () => {
+    setShowLoginModal(true)
+  }
+
+  const performLoginAndSync = async () => {
+    setIsLoggingIn(true)
+    setLoginError(null)
+    
     try {
-      const url = `${LT_BACKEND.replace(/\/$/, '')}/api/sdk/import`
-      const sdkBase = process.env.REACT_APP_SDK_BASE_URL || 'http://localhost:5001'
-      const logUrl = `${sdkBase.replace(/\/$/, '')}/api/log`
-
-      // Log to backend terminal via SDK server (non-blocking, no credentials needed)
-      try {
-        await fetch(logUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(course)
-        }).catch(() => {
-          // Ignore errors - logging is non-critical
-        })
-      } catch (logErr) {
-        // Ignore logging errors
-      }
-
-      // POST normalized payload to Learning Tokens backend
-      const res = await fetch(url, {
+      // 1. Login to get JWT
+      const loginResponse = await fetch(`${LT_BACKEND}/api/auth/instructor-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(course)
+        body: JSON.stringify({
+          email: loginEmail,
+          password: loginPassword
+        })
       })
-      if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        throw new Error(`Failed to send payload: ${res.status} ${res.statusText} ${text}`)
+
+      if (!loginResponse.ok) {
+        const errData = await loginResponse.json().catch(() => ({}))
+        throw new Error(errData.message || 'Login failed. Please check your credentials.')
       }
 
-      // Show success message — do NOT redirect (backend integration may come later)
-      console.info('Payload sent successfully to Learning Tokens backend:', url)
-    } catch (e) {
-      console.warn('Error sending course to Learning Tokens backend (saving locally):', e)
-      // Save payload locally so it can be retried/imported later when backend is available
-      try {
-        const key = `ltsdk_pending_import_${lms}_${courseId}`
-        localStorage.setItem(key, JSON.stringify({ course, createdAt: new Date().toISOString() }))
-        console.info(`Saved pending import to localStorage key=${key}`)
-      } catch (se) {
-        console.warn('Failed to save pending import to localStorage:', se)
+      const loginData = await loginResponse.json()
+      // Handle nested result structure (e.g. { result: { token: ... } })
+      const token = loginData.token || loginData.access_token || (loginData.result && (loginData.result.token || loginData.result.access_token))
+
+      if (!token) {
+        throw new Error('No access token received from login.')
       }
+
+      // 2. Sync Data using the token
+      await sendCourseToLearningTokens(token)
+      
+      // Close modal only on success
+      setShowLoginModal(false)
+
+    } catch (error) {
+      console.error('Login/Sync Error:', error)
+      setLoginError(error.message)
+    } finally {
+      setIsLoggingIn(false)
+    }
+  }
+
+  const sendCourseToLearningTokens = async (accessToken) => {
+    if (!course) return
+    setSendingToLT(true)
+    
+    try {
+      // Helper to calculate score and grade
+      const calculateStudentPerformance = (learner) => {
+        const assignments = learner.assignments || []
+        if (assignments.length === 0) return { score: 0, grade: 'N/A' }
+
+        let totalPercentage = 0
+        let gradedCount = 0
+
+        assignments.forEach(asn => {
+          const sub = asn.submissions?.[0]
+          if (sub && sub.grades?.[0]?.percentage !== undefined) {
+            totalPercentage += sub.grades[0].percentage
+            gradedCount++
+          }
+        })
+
+        if (gradedCount === 0) return { score: 0, grade: 'N/A' }
+
+        const averageScore = Math.round(totalPercentage / gradedCount)
+        
+        let grade = 'F'
+        if (averageScore >= 90) grade = 'A'
+        else if (averageScore >= 80) grade = 'B'
+        else if (averageScore >= 70) grade = 'C'
+        else if (averageScore >= 60) grade = 'D'
+
+        return { score: averageScore, grade }
+      }
+
+      // Prepare Normalized Data with user inputs
+      const normalizedPayload = {
+        course: {
+          id: course.course.id,
+          name: course.course.name,
+          description: course.course.description || course.course.metadata?.short_description || '',
+          url: window.location.href 
+        },
+        category: ltCategory,
+        skills: ltSkills,
+        students: (course.learners || []).map(l => {
+          const performance = calculateStudentPerformance(l)
+          return {
+            name: l.name || l.username,
+            email: l.email, 
+            grade: performance.grade, 
+            score: performance.score,
+            assignments: l.assignments // Pass rich assignment data
+          }
+        })
+      }
+
+      const result = await syncLmsDataToLearningTokens(normalizedPayload, accessToken, LT_BACKEND)
+
+      console.info('Payload sent successfully:', result)
+      
+      // Handle Redirect
+      if (result.redirectUrl) {
+        // Prepend Dashboard URL if relative (Assuming Dashboard is on port 5173)
+        const dashboardUrl = 'http://localhost:5173' 
+        window.location.href = `${dashboardUrl}${result.redirectUrl}`
+      } else {
+        alert("Import successful! Please check your Learning Tokens Dashboard.")
+      }
+
+    } catch (e) {
+      console.warn('Error sending course to Learning Tokens backend:', e)
+      // Re-throw so the login handler catches it and shows the error in the modal
+      throw e 
     } finally {
       setSendingToLT(false)
     }
@@ -1436,6 +1524,37 @@ export default function CoursePage() {
           borderRadius: '8px',
           marginBottom: '1.5rem'
         }}>
+          {/* Learning Tokens Metadata Inputs */}
+          <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #fcd34d' }}>
+            <h5 style={{ margin: '0 0 0.5rem 0', color: '#92400e' }}>Required Metadata for Learning Tokens</h5>
+            <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#92400e', marginBottom: '0.25rem' }}>
+                  Course Category
+                </label>
+                <input
+                  type="text"
+                  value={ltCategory}
+                  onChange={(e) => setLtCategory(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #fcd34d' }}
+                  placeholder="e.g. Computer Science"
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#92400e', marginBottom: '0.25rem' }}>
+                  Skills / Taxonomy
+                </label>
+                <input
+                  type="text"
+                  value={ltSkills}
+                  onChange={(e) => setLtSkills(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #fcd34d' }}
+                  placeholder="e.g. Blockchain, Solidity"
+                />
+              </div>
+            </div>
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
             <input
               type="checkbox"
@@ -1569,7 +1688,7 @@ export default function CoursePage() {
 
         {/* Action Button */}
         <button
-          onClick={() => sendCourseToLearningTokens()}
+          onClick={handleAssignTokensClick}
           disabled={!confirmed || sendingToLT}
           style={{
             background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
@@ -1621,6 +1740,120 @@ export default function CoursePage() {
       background: '#ffffff',
       padding: '2rem'
     }}>
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            padding: '2rem',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '400px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#1f2937' }}>Login to Authorize</h3>
+            <p style={{ color: '#6b7280', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+              Please enter your Learning Tokens Instructor credentials to proceed.
+            </p>
+            
+            {loginError && (
+              <div style={{ 
+                background: '#fee2e2', 
+                color: '#991b1b', 
+                padding: '0.75rem', 
+                borderRadius: '8px', 
+                marginBottom: '1rem',
+                fontSize: '0.875rem'
+              }}>
+                {loginError}
+              </div>
+            )}
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                Email
+              </label>
+              <input
+                type="email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  fontSize: '1rem'
+                }}
+                placeholder="instructor@example.com"
+              />
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                Password
+              </label>
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  fontSize: '1rem'
+                }}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowLoginModal(false)}
+                style={{
+                  background: 'none',
+                  border: '1px solid #d1d5db',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  color: '#374151'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={performLoginAndSync}
+                disabled={isLoggingIn}
+                style={{
+                  background: '#0066cc',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  color: 'white',
+                  opacity: isLoggingIn ? 0.7 : 1
+                }}
+              >
+                {isLoggingIn ? 'Verifying...' : 'Login & Sync'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         {/* Header */}
         <div style={{

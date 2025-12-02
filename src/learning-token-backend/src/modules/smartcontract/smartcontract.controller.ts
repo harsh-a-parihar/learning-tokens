@@ -10,7 +10,9 @@ import {
     UseGuards,
     Req,
     DefaultValuePipe,
-    ParseIntPipe
+    ParseIntPipe,
+    HttpCode,
+    HttpStatus
 } from '@nestjs/common'
 import { SmartcontractService } from './smartcontract.service'
 import { CreateCourseDto } from './dto/create-course.dto'
@@ -61,6 +63,7 @@ export class SmartcontractController {
     @UseGuards(JwtAuthGuard)
     @AllowUserTypes(RoleEnum.INSTRUCTOR)
     @Post('token-distributions')
+    @HttpCode(HttpStatus.CREATED)
     async distributeToken(
         @Req() req: Request,
         @Body() distributeToken: DistributeTokenDto
@@ -91,6 +94,7 @@ export class SmartcontractController {
     @UseGuards(JwtAuthGuard)
     @AllowUserTypes(RoleEnum.INSTRUCTOR)
     @Post('create-course')
+    @HttpCode(HttpStatus.CREATED)
     async createCourse(
         @Req() req: Request,
         @Body() createCourseDto: CreateCourseDto

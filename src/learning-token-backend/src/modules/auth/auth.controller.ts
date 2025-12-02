@@ -95,7 +95,10 @@ export class AuthController {
             }
         } catch (error) {
             console.log(error)
-            throw new ConflictException(error.message)
+            if (error.status === 409 || error.message.includes('exists')) {
+                throw new ConflictException(error.message)
+            }
+            throw error
         }
     }
 

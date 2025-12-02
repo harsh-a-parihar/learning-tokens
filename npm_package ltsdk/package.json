@@ -1,6 +1,6 @@
 {
   "name": "ltsdk",
-  "version": "1.0.9",
+  "version": "1.1.2",
   "description": "Learning Tokens SDK (LMS Connector) - Unified connector for LMS (Canvas, edX, Moodle, Google Classroom) to learning tokens platform",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -24,19 +24,19 @@
     "ltsdk": "./bin/ltsdk.js"
   },
   "scripts": {
-  "clean": "rm -rf dist",
-  "build": "npm run clean && tsc",
-  "build:frontend": "cd frontend && npm run build",
-  "test": "jest",
-  "smoke": "jest --testPathPattern=tests/smoke --runInBand",
-  "dev-server": "PORT=5001 node -r dotenv/config local-server/server.js",
-  "dev-auth": "LTSDK_AUTH_PORT=5002 node local-server/auth/auth-server.js",
-  "dev:frontend": "cd frontend && npm start",
-  "start": "npm run dev:all:auth",
-  "dev:all:auth": "concurrently \"npm run dev-server\" \"npm run dev-auth\" \"npm run dev:frontend\"",
-  "install:frontend": "cd frontend && npm install",
-  "postinstall": "cd frontend && npm install",
-  "prepublishOnly": "npm run build && npm test"
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc",
+    "build:frontend": "cd frontend && npm run build",
+    "test": "jest",
+    "smoke": "jest --testPathPattern=tests/smoke --runInBand",
+    "dev-server": "PORT=5001 node -r dotenv/config local-server/server.js",
+    "dev-auth": "LTSDK_AUTH_PORT=5002 node local-server/auth/auth-server.js",
+    "dev:frontend": "cd frontend && npm start",
+    "start": "npm run dev:all:auth",
+    "dev:all:auth": "concurrently \"npm run dev-server\" \"npm run dev-auth\" \"PORT=3002 npm run dev:frontend\"",
+    "install:frontend": "cd frontend && npm install",
+    "postinstall": "cd frontend && npm install",
+    "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [
     "lms",

@@ -81,6 +81,7 @@ const Login = () => {
               loginAdmin({
                 email: values.email,
                 password: values.password,
+                type: values.type,
               })
                 .unwrap()
                 .then((res: any) => {
@@ -89,7 +90,22 @@ const Login = () => {
                     toast.success("Successfully Signed In");
                     navigate("/");
                   }
+                })
+                .catch((e: any) => {
+                  console.error("Login error:", e);
+                  toast.error("Login failed: " + (e?.data?.message || "Something went wrong"));
                 });
+            }
+          })
+          .catch((e: any) => {
+            console.error("Registration error:", e);
+            const errorData = e?.data;
+            const errorMessage = errorData?.message || e?.message || "Something went wrong";
+            
+            if (errorMessage.includes("already exists") || errorMessage.includes("duplicate") || e?.status === 409) {
+              toast.error("This email is already registered. Please log in instead.");
+            } else {
+              toast.error("Registration failed: " + errorMessage);
             }
           });
       } else if (values.type === "institution") {
@@ -122,7 +138,22 @@ const Login = () => {
                     toast.success("Successfully Signed In");
                     navigate("/");
                   }
+                })
+                .catch((e: any) => {
+                  console.error("Login error:", e);
+                  toast.error("Login failed: " + (e?.data?.message || "Something went wrong"));
                 });
+            }
+          })
+          .catch((e: any) => {
+            console.error("Registration error:", e);
+            const errorData = e?.data;
+            const errorMessage = errorData?.message || e?.message || "Something went wrong";
+            
+            if (errorMessage.includes("already exists") || errorMessage.includes("duplicate") || e?.status === 409) {
+              toast.error("This email is already registered. Please log in instead.");
+            } else {
+              toast.error("Registration failed: " + errorMessage);
             }
           });
       }

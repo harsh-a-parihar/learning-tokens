@@ -8,7 +8,7 @@ WORKDIR /app
 COPY ./package.json /app/
 
 # Then install the NPM module
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Copy current directory to APP folder
 COPY . /app/

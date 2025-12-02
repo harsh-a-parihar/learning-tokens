@@ -7,6 +7,8 @@ import { useEventContext } from "../../contexts/EventContext";
 import { Container, Row, Col, Card, Table, Button } from "react-bootstrap";
 import axios from "axios";
 import { SuccessModal } from "../../components/Modal/SuccessModal";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store";
 
 const initialValues = {
   organizer: "",
@@ -41,13 +43,14 @@ const validationSchema = object().shape({
 const ScoringGuide = () => {
   const { id } = useParams();
   const formikRef = useRef<FormikProps<any>>(null);
-  const { eventData } = useEventContext();
+  const { eventData, setEventData } = useEventContext();
+  const auth = useSelector((state: RootState) => state.auth);
   const [isModalVisible, setModalVisible] = useState(false);
   const [formEditable, setFormEditable] = useState(true);
   const [modalMessage, setModalMessage] = useState("");
   
   useEffect (() => {
-    if (eventData.status !== "defineScoringGuide") {
+    if (eventData && eventData.status !== "defineScoringGuide") {
       setFormEditable(false);
     }
   }, [eventData]);
@@ -64,21 +67,57 @@ const ScoringGuide = () => {
         scoreTokenAmount: Number(values.learnerScoreToken),
         helpTokenAmount: Number(values.helpTokenAmount),
         instructorScoreToken: Number(values.instructorScoreToken),
+      }, {
+        headers: {
+          Authorization: `Bearer ${auth.accessToken}`,
+        },
       });
 
       if (response.status === 201) {
         setModalMessage(response.data.message);
         setModalVisible(true);
         setFormEditable(false);
+        
+        // Refresh event data to get updated courseCreateStatus
+        try {
+          const eventResponse = await axios.get(`${import.meta.env.VITE_API_URL}/preevent/${eventData.id}`, {
+            headers: {
+              Authorization: `Bearer ${auth.accessToken}`,
+            },
+          });
+          setEventData(eventResponse.data);
+          console.log('[ScoringGuide] Event data refreshed after scoring guide creation');
+        } catch (refreshError) {
+          console.error('[ScoringGuide] Error refreshing event data:', refreshError);
+        }
       }
     } catch (error) {
       console.error("Error adding scoring guide:", error);
+      const errorMessage = error.response?.data?.message || 
+                           error.response?.data?.error || 
+                           error.message || 
+                           'Failed to create scoring guide. Please try again.';
+      setModalMessage(`Error: ${errorMessage}`);
+      setModalVisible(true);
     }
   };
 
   const closeModal = () => {
     setModalVisible(false);
   };
+
+  // Guard: Don't render if eventData is not loaded yet
+  if (!eventData) {
+    return (
+      <Container className="mt-4">
+        <Card>
+          <Card.Body>
+            <div className="text-center">Loading event data...</div>
+          </Card.Body>
+        </Card>
+      </Container>
+    );
+  }
 
   return (
     <Container className="mt-4">
@@ -107,10 +146,27 @@ const ScoringGuide = () => {
                 <div className="font-medium border-top pt-3 mb-3"><strong>Event ID: {id}</strong></div>
 
                 {eventData && (
-                  <div className="border-top pt-3">
-                    <div className="font-medium mb-3"><strong>Institution: {eventData.organization}</strong></div>
-                    <Row>
-                      <Col>
+                  <div className="pt-3">
+                    <div className="d-flex justify-content-between align-items-center mb-4">
+                         <div className="font-medium text-secondary"><strong>Institution:</strong> {eventData.organization}</div>
+                         {eventData?.onlineEvent?.scoringGuide?.ipfsHash && (
+                             <div className="text-end">
+                                 <strong>IPFS Metadata: </strong>
+                                 <a 
+                                     href={`https://gateway.pinata.cloud/ipfs/${eventData.onlineEvent.scoringGuide.ipfsHash}`} 
+                                     target="_blank" 
+                                     rel="noopener noreferrer"
+                                     className="text-primary text-decoration-none"
+                                 >
+                                     {eventData.onlineEvent.scoringGuide.ipfsHash.substring(0, 10)}...
+                                     <i className="bi bi-box-arrow-up-right ms-1"></i>
+                                 </a>
+                             </div>
+                         )}
+                    </div>
+
+                    <Row className="g-3 mb-4">
+                      <Col md={6}>
                         <TextInput
                           name="community"
                           type="text"
@@ -119,7 +175,7 @@ const ScoringGuide = () => {
                           disabled={!formEditable}
                         />
                       </Col>
-                      <Col>
+                      <Col md={6}>
                         <TextInput
                           name="organizer"
                           type="text"
@@ -130,10 +186,14 @@ const ScoringGuide = () => {
                       </Col>
                     </Row>
 
-                    <div className="font-medium mb-3"><strong>Instructors: {eventData.speakersName.join(", ")}</strong></div>
+                    {eventData.speakersName && Array.isArray(eventData.speakersName) && eventData.speakersName.length > 0 && (
+                      <div className="mb-4">
+                          <strong className="text-secondary">Instructors:</strong> {eventData.speakersName.join(", ")}
+                      </div>
+                    )}
 
-                    <Row>
-                      <Col>
+                    <Row className="g-3">
+                      <Col md={6}>
                         <TextInput
                           name="fieldsOfKnowledge"
                           type="text"
@@ -142,7 +202,7 @@ const ScoringGuide = () => {
                           disabled={!formEditable}
                         />
                       </Col>
-                      <Col>
+                      <Col md={6}>
                         <TextInput
                           name="taxonomyOfSkills"
                           type="text"
@@ -152,6 +212,29 @@ const ScoringGuide = () => {
                         />
                       </Col>
                     </Row>
+                    
+                    {eventData?.onlineEvent?.scoringGuide?.scoringGuide && (
+                        <div className="mt-4 text-end border-top pt-3">
+                            <Button 
+                                variant="outline-dark" 
+                                size="sm"
+                                onClick={() => {
+                                    const jsonString = JSON.stringify(eventData.onlineEvent.scoringGuide.scoringGuide, null, 2);
+                                    const blob = new Blob([jsonString], { type: "application/json" });
+                                    const url = URL.createObjectURL(blob);
+                                    const link = document.createElement("a");
+                                    link.href = url;
+                                    link.download = `LMS_Data_${eventData.meetingEventId}.json`;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                }}
+                            >
+                                <i className="bi bi-download me-2"></i>
+                                Download Full LMS Data (JSON)
+                            </Button>
+                        </div>
+                    )}
                   </div>
                 )}
 
@@ -219,7 +302,7 @@ const ScoringGuide = () => {
               </Card.Body>
             </Card>
 
-            {eventData.status === "defineScoringGuide" && formEditable && (
+            {eventData && eventData.status === "defineScoringGuide" && formEditable && (
               <Button
                 size="sm"
                 className="w-100 mt-3"

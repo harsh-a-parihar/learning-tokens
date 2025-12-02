@@ -20,7 +20,6 @@ import { getWallet } from 'src/utils/kaledio'
 import { sendLoginCredentials } from 'src/common/helpers/utils.helper'
 import { Role } from '../role/entities/role.entity'
 import { SmartcontractService } from '../smartcontract/smartcontract.service'
-import { SmartcontractFunctionsEnum } from '../smartcontract/enums/smartcontract-functions.enum'
 @Injectable()
 export class PosteventService {
     constructor(
@@ -66,30 +65,8 @@ export class PosteventService {
                         ...element,
                         preevent: event
                     })
-                    const createdAt = Math.floor(Date.now() / 1000)
-
-                    let body = {}
-                    // check if the learner is already registered in the blockchain
-                    // if (learner) {
-                    //     body = {
-                    //         role: 'learner',
-                    //         id: learner.id,
-                    //         functionName:
-                    //             SmartcontractFunctionsEnum.REGISTER_LEARNER,
-                    //         params: [
-                    //             learner.name,
-                    //             createdAt,
-                    //             learner.latitude !== null
-                    //                 ? learner.latitude
-                    //                 : '123.123',
-                    //             learner.longitude !== null
-                    //                 ? learner.longitude
-                    //                 : '123.123'
-                    //         ]
-                    //     }
-                    //     await this.smartContractService.onboardingActor(body)
-                    // }
                     if (!learner) {
+                        // Create new learner in database
                         const _learner = new Learner()
                         _learner.name = element.name
                         _learner.role = role
@@ -104,45 +81,45 @@ export class PosteventService {
                                 _learner
                             )
 
-                        // await sendLoginCredentials(
-                        //     element.email,
-                        //     element.email,
-                        //     '12345678',
-                        //     'Dear learner, Please login with credentials'
-                        // )
-                        //     .then((res) => {})
-                        //     .catch((err) => {
-                        //         console.log(err)
-                        //         throw new BadRequestException('Email not sent')
-                        //     })
-
+                        // Get wallet from Kaleido HD wallet and assign to learner
                         const wallet = await getWallet(
                             'learner',
                             registeredLearner.id
                         )
                         registeredLearner.publicAddress = wallet.address
-
                         await transactionalEntityManager.save(
                             Learner,
                             registeredLearner
                         )
-                        body = {
-                            role: 'learner',
-                            id: registeredLearner.id,
-                            functionName:
-                                SmartcontractFunctionsEnum.REGISTER_LEARNER,
-                            params: [
+
+                        // Register learner on-chain using reusable method (DRY)
+                        try {
+                            await this.smartContractService.registerLearnerOnChain(
+                                registeredLearner.id,
                                 registeredLearner.name,
-                                createdAt,
-                                registeredLearner.latitude !== null
-                                    ? registeredLearner.latitude
-                                    : '123.123',
-                                registeredLearner.longitude !== null
-                                    ? registeredLearner.longitude
-                                    : '123.123'
-                            ]
+                                registeredLearner.latitude || '0',
+                                registeredLearner.longitude || '0'
+                            )
+                        } catch (error) {
+                            console.error(`[PosteventService] Failed to register learner ${registeredLearner.id} on-chain:`, error.message)
+                            // Continue processing - don't block other learners
+                            // The learner exists in DB but may not be on-chain
                         }
-                        await this.smartContractService.onboardingActor(body)
+                    } else {
+                        // Learner exists - ensure they're registered on-chain
+                        if (learner.status !== true) {
+                            try {
+                                await this.smartContractService.registerLearnerOnChain(
+                                    learner.id,
+                                    learner.name,
+                                    learner.latitude || '0',
+                                    learner.longitude || '0'
+                                )
+                            } catch (error) {
+                                console.error(`[PosteventService] Failed to register existing learner ${learner.id} on-chain:`, error.message)
+                                // Continue processing
+                            }
+                        }
                     }
                     //storing the post event user in the table
                     await transactionalEntityManager.save(Postevent, postevent)

@@ -37,6 +37,28 @@ yarn
 yarn dev
 ```
 
+## Learning Tokens SDK Integration
+
+The system now supports direct integration with Learning Management Systems (LMS) via the `ltsdk` package. This allows for:
+
+1.  **Seamless Data Import**: Instructors can import course data, student rosters, and grades directly from Canvas, Moodle, Open edX, and Google Classroom.
+2.  **Automated On-chain Registration**:
+    *   **Institutions & Instructors**: Automatically linked and verified on the blockchain during the import process.
+    *   **Learners**: Automatically registered on the blockchain if they don't already exist, ensuring they have a wallet address to receive tokens.
+3.  **Auto-Course Creation**: Courses imported from an LMS are automatically created on the blockchain, removing the need for manual setup.
+4.  **Token Distribution**: Once imported, instructors can easily define scoring guides and distribute granular achievement tokens (Attendance, Score, Help, Instructor Score) to learners based on their LMS performance.
+
+### How to Use the SDK with the Local Environment
+
+1.  Ensure the `learning-token-backend` is running.
+2.  Install and run the SDK:
+    ```bash
+    npm install -g ltsdk
+    ltsdk start
+    ```
+3.  Follow the on-screen instructions to connect your LMS and import a course.
+4.  The SDK will redirect you to the Learning Tokens Dashboard to finalize token distribution.
+
 # If anyone wants to start with quorum-test-network with hyperledger besu
 
 1. Go to the `quorum-test-network` directory. start with running

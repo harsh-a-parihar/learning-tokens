@@ -40,13 +40,31 @@ export class AuthService {
         password,
         type,
         latitude,
-        longitude
+        longitude,
+        publicAddress
     }: any) {
         if (type == 'Admin') {
+            // Check if user already exists
+            const existingUser = await this.userRepository.findOne({
+                where: { email: email }
+            })
+            if (existingUser) {
+                throw new Error('An account with this email already exists. Please use a different email or try logging in.')
+            }
+            
+            // Get admin role
+            const adminRole = await this.roleRepository.findOne({
+                where: { name: 'admin' }
+            })
+            if (!adminRole) {
+                throw new Error('Admin role not found. Please contact system administrator.')
+            }
+            
             const user = new User()
             user.name = name
             user.email = email
             user.password = this.jwtService.encodePassword(password)
+            user.role = adminRole
             const registeredUser = await this.userRepository.save(user)
             return {
                 id: registeredUser.id,
@@ -57,6 +75,14 @@ export class AuthService {
                 updatedAt: registeredUser.updatedAt
             }
         } else if (type == 'Institution') {
+            // Check if institution already exists
+            const existingInstitution = await this.institutionRepository.findOne({
+                where: { email: email }
+            })
+            if (existingInstitution) {
+                throw new Error('An account with this email already exists. Please use a different email or try logging in.')
+            }
+            
             const user = new Institution()
             user.name = name
             user.email = email
@@ -87,13 +113,30 @@ export class AuthService {
             }
             //no longer registering from the api
         } else if (type == 'Learner') {
+            // Check if learner already exists
+            const existingLearner = await this.learnerRepository.findOne({
+                where: { email: email }
+            })
+            if (existingLearner) {
+                throw new Error('An account with this email already exists. Please use a different email or try logging in.')
+            }
+            
+            // Get learner role
+            const learnerRole = await this.roleRepository.findOne({
+                where: { name: 'learner' }
+            })
+            if (!learnerRole) {
+                throw new Error('Learner role not found. Please contact system administrator.')
+            }
+            
             const user = new Learner()
             user.name = name
             user.email = email
-            // user.publicAddress = publicAddress
+            user.publicAddress = publicAddress
             user.password = this.jwtService.encodePassword(password)
             user.latitude = latitude
             user.longitude = longitude
+            user.role = learnerRole
             const registeredUser = await this.learnerRepository.save(user)
             return {
                 id: registeredUser.id,
@@ -104,11 +147,28 @@ export class AuthService {
                 updatedAt: registeredUser.updatedAt
             }
         } else if (type == 'Instructor') {
+            // Check if instructor already exists
+            const existingInstructor = await this.insturctorRepository.findOne({
+                where: { email: email }
+            })
+            if (existingInstructor) {
+                throw new Error('An account with this email already exists. Please use a different email or try logging in.')
+            }
+            
+            // Get instructor role
+            const instructorRole = await this.roleRepository.findOne({
+                where: { name: 'instructor' }
+            })
+            if (!instructorRole) {
+                throw new Error('Instructor role not found. Please contact system administrator.')
+            }
+            
             const user = new Instructor()
             user.name = name
             user.email = email
-            // user.publicAddress = publicAddress
+            user.publicAddress = publicAddress
             user.password = this.jwtService.encodePassword(password)
+            user.roleId = instructorRole.id
             const registeredUser = await this.insturctorRepository.save(user)
             return {
                 id: registeredUser.id,
@@ -128,7 +188,12 @@ export class AuthService {
         })
         if (!user) {
             // IF USER NOT FOUND
-            return
+            return null
+        }
+
+        // Check if user has a role assigned
+        if (!user.role) {
+            throw new Error('User account is missing a role. Please contact system administrator.')
         }
 
         const isPasswordValid: boolean = this.jwtService.isPasswordValid(
@@ -138,7 +203,7 @@ export class AuthService {
 
         if (!isPasswordValid) {
             // IF PASSWORD DOES NOT MATCH
-            return
+            return null
         }
 
         const token: string = this.jwtService.generateToken(user, 'admin')

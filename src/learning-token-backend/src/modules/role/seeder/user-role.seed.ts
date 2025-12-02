@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import * as bcrypt from 'bcrypt'
+import * as bcrypt from 'bcryptjs'
 import { Role } from '../entities/role.entity'
 import { Repository } from 'typeorm'
 import { User } from 'src/modules/admins/entities/user.entity'
@@ -23,8 +23,8 @@ export class UserSeed implements OnModuleInit {
     }
 
     public async run() {
-        const salt = await bcrypt.genSalt(10)
-        const hashedPassword = await bcrypt.hash('password', salt)
+        const salt: string = bcrypt.genSaltSync(10)
+        const hashedPassword: string = bcrypt.hashSync('password', salt)
         //insert mock data to role repository if empty from RoleEnum
         const roles = Object.values(RoleEnum).map((roleName) => ({
             name: roleName,

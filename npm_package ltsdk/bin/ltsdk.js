@@ -4,14 +4,12 @@
  * Main entry point for the ltsdk command
  */
 
-const readline = require('readline');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 
 const AUTH_PORT = process.env.LTSDK_AUTH_PORT || 5002;
-const KEYS_PATH = path.join(__dirname, '..', 'local-server', 'auth', 'keys.json');
 
 // Colors for terminal output
 const colors = {
@@ -27,45 +25,6 @@ const colors = {
 
 function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
-}
-
-function loadKeys() {
-  try {
-    const keysData = fs.readFileSync(KEYS_PATH, 'utf8');
-    const parsed = JSON.parse(keysData);
-    return parsed.validKeys || [];
-  } catch (e) {
-    return [];
-  }
-}
-
-function validateKey(inputKey, keys) {
-  const key = keys.find(k => k.key === inputKey && k.status === 'active');
-  return key ? { valid: true, university: key.university } : { valid: false };
-}
-
-function createReadlineInterface() {
-  return readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-}
-
-function promptKey(rl) {
-  return new Promise((resolve) => {
-    log('\nPlease enter your LTSDK (Learning Tokens SDK) access key:', 'cyan');
-    log('   (You can get this from your institution administrator)', 'yellow');
-    log('');
-    
-    rl.question('   Access Key: ', (answer) => {
-      resolve(answer.trim());
-    });
-  });
-}
-
-function showVerifying() {
-  log('\n⏳ Verifying access key...', 'yellow');
-  return new Promise(resolve => setTimeout(resolve, 2000));
 }
 
 function showWelcome() {
@@ -95,7 +54,7 @@ function showGuide() {
   log('2. The SDK will start three services:', 'reset');
   log('   • SDK Server (port 5001)', 'green');
   log('   • Auth Server (port 5002)', 'green');
-  log('   • Frontend UI (port 3000)', 'green');
+  log('   • Frontend UI (port 3002)', 'green');
   log('3. Your browser will open automatically to the dashboard', 'reset');
   log('4. Select your LMS platform and configure credentials', 'reset');
   log('5. Start managing courses and assigning Learning Tokens!', 'reset');
@@ -146,12 +105,13 @@ function startServices() {
   });
   children.push(authServer);
   
-  // Start Frontend (port 3000)
+  // Start Frontend (port 3002)
   const frontendPath = path.join(packagePath, 'frontend');
   const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const frontend = spawn(npmCmd, ['start'], {
     cwd: frontendPath,
     stdio: 'inherit',
+    env: { ...process.env, PORT: '3002' },
     shell: false
   });
   children.push(frontend);
@@ -178,15 +138,15 @@ function startServices() {
         : 'xdg-open';
     
     try {
-      require('child_process').exec(`${openBrowser} http://localhost:3000`, (err) => {
+      require('child_process').exec(`${openBrowser} http://localhost:3002`, (err) => {
         if (err) {
-          log('\n🌐 Please open your browser and navigate to: http://localhost:3000', 'cyan');
+          log('\n🌐 Please open your browser and navigate to: http://localhost:3002', 'cyan');
         } else {
-          log('\n🌐 Opening browser to http://localhost:3000...', 'cyan');
+          log('\n🌐 Opening browser to http://localhost:3002...', 'cyan');
         }
       });
     } catch (e) {
-      log('\n🌐 Please open your browser and navigate to: http://localhost:3000', 'cyan');
+      log('\n🌐 Please open your browser and navigate to: http://localhost:3002', 'cyan');
     }
   }, 5000);
 
@@ -227,54 +187,13 @@ async function main() {
     // Show guide
     showGuide();
     
-    // Prompt for LTSDK key
-    const rl = createReadlineInterface();
-    const keys = loadKeys();
+    log('\n🚀 Initializing SDK...', 'cyan');
     
-    let validated = false;
-    let attempts = 0;
-    const maxAttempts = 3;
+    // Small delay before starting services
+    await new Promise(resolve => setTimeout(resolve, 5000));
     
-    while (!validated && attempts < maxAttempts) {
-      const inputKey = await promptKey(rl);
-      
-      if (!inputKey) {
-        log('\nAccess key cannot be empty. Please try again.', 'red');
-        attempts++;
-        continue;
-      }
-      
-      // Show verifying message
-      await showVerifying();
-      
-      // Validate key
-      const result = validateKey(inputKey, keys);
-      
-      if (result.valid) {
-        log(`\n✅ Access key verified!`, 'green');
-        if (result.university) {
-          log(`   Institution: ${result.university}`, 'cyan');
-        }
-        validated = true;
-        rl.close();
-        
-        // Small delay before starting services
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Start services
-        startServices();
-      } else {
-        attempts++;
-        if (attempts < maxAttempts) {
-          log(`\nInvalid access key. Please try again. (${attempts}/${maxAttempts} attempts)`, 'red');
-          log('');
-        } else {
-          log(`\nMaximum attempts reached. Please contact your institution administrator.`, 'red');
-          rl.close();
-          process.exit(1);
-        }
-      }
-    }
+    // Start services
+    startServices();
   } else {
     log('Usage: ltsdk start', 'yellow');
     log('');
